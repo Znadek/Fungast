@@ -1,9 +1,9 @@
 package com.fungast.app
 
-import org.junit.Assert.assertEquals
-import org.junit.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
 
-class ExampleUnitTest {
+class ExampleTest {
     @Test
     fun addition_isCorrect() {
         assertEquals(4, 2 + 2)

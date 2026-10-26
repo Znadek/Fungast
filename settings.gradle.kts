@@ -20,4 +20,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "Fungast"
-include(":app")
+include(":composeApp")
