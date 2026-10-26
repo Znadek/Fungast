@@ -1,26 +1,47 @@
 package com.fungast.app
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.fungast.app.data.SpotDao
+import com.fungast.app.location.LocationProvider
+import com.fungast.app.ui.PlatformBackHandler
+import com.fungast.app.ui.spots.AddSpotScreen
+import com.fungast.app.ui.spots.SpotListScreen
+import com.fungast.app.ui.spots.SpotsViewModel
 import com.fungast.app.ui.theme.FungastTheme
 
+private enum class Screen { SpotList, AddSpot }
+
 @Composable
-fun App() {
+fun App(spotDao: SpotDao, locationProvider: LocationProvider) {
     FungastTheme {
-        Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(text = "Ciao Fungast!")
+        val viewModel = viewModel { SpotsViewModel(spotDao) }
+        var screen by rememberSaveable { mutableStateOf(Screen.SpotList) }
+
+        when (screen) {
+            Screen.SpotList -> {
+                val spots by viewModel.spots.collectAsStateWithLifecycle()
+                SpotListScreen(
+                    spots = spots,
+                    onAddSpot = { screen = Screen.AddSpot },
+                    onDeleteSpot = viewModel::deleteSpot,
+                )
+            }
+            Screen.AddSpot -> {
+                PlatformBackHandler { screen = Screen.SpotList }
+                AddSpotScreen(
+                    locationProvider = locationProvider,
+                    onSave = { name, category, notes, location ->
+                        viewModel.addSpot(name, category, notes, location)
+                        screen = Screen.SpotList
+                    },
+                    onBack = { screen = Screen.SpotList },
+                )
             }
         }
     }

@@ -1,0 +1,135 @@
+package com.fungast.app.ui.spots
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import com.fungast.app.data.Spot
+import com.fungast.app.ui.formatDateTime
+import com.fungast.app.ui.formatLatLon
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SpotListScreen(
+    spots: List<Spot>,
+    onAddSpot: () -> Unit,
+    onDeleteSpot: (Spot) -> Unit,
+) {
+    var spotToDelete by remember { mutableStateOf<Spot?>(null) }
+
+    Scaffold(
+        topBar = { TopAppBar(title = { Text("I miei posti") }) },
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                onClick = onAddSpot,
+                icon = { Icon(Icons.Filled.Add, contentDescription = null) },
+                text = { Text("Salva posto") },
+            )
+        },
+    ) { innerPadding ->
+        if (spots.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize().padding(innerPadding).padding(32.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "Nessun posto salvato.\nQuando sei sul posto, tocca \"Salva posto\".",
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = innerPadding.calculateTopPadding() + 8.dp,
+                    // Leave room so the FAB doesn't cover the last item
+                    bottom = innerPadding.calculateBottomPadding() + 88.dp,
+                ),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(spots, key = { it.id }) { spot ->
+                    SpotItem(spot = spot, onDelete = { spotToDelete = spot })
+                }
+            }
+        }
+    }
+
+    spotToDelete?.let { spot ->
+        AlertDialog(
+            onDismissRequest = { spotToDelete = null },
+            title = { Text("Eliminare \"${spot.name}\"?") },
+            text = { Text("Il posto verrà cancellato definitivamente.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDeleteSpot(spot)
+                    spotToDelete = null
+                }) { Text("Elimina") }
+            },
+            dismissButton = {
+                TextButton(onClick = { spotToDelete = null }) { Text("Annulla") }
+            },
+        )
+    }
+}
+
+@Composable
+private fun SpotItem(spot: Spot, onDelete: () -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(spot.name, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "${spot.category.label} · ${formatDateTime(spot.createdAt)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    formatLatLon(spot.latitude, spot.longitude),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (spot.notes.isNotEmpty()) {
+                    Text(spot.notes, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
+                }
+            }
+            IconButton(onClick = onDelete) {
+                Icon(Icons.Outlined.Delete, contentDescription = "Elimina")
+            }
+        }
+    }
+}
