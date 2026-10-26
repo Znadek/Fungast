@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Simple mushroom icon -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFF3E0"
+        android:pathData="M46,54 L62,54 L60,78 Q54,82 48,78 Z" />
+    <path
+        android:fillColor="#C62828"
+        android:pathData="M30,56 Q30,30 54,30 Q78,30 78,56 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M44,42 m-4,0 a4,4 0,1 1,8 0 a4,4 0,1 1,-8 0 M62,40 m-3,0 a3,3 0,1 1,6 0 a3,3 0,1 1,-6 0 M55,50 m-3,0 a3,3 0,1 1,6 0 a3,3 0,1 1,-6 0" />
+</vector>
