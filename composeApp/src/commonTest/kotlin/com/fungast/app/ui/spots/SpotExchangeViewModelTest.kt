@@ -3,6 +3,7 @@ package com.fungast.app.ui.spots
 import com.fungast.app.data.Spot
 import com.fungast.app.data.SpotCategory
 import com.fungast.app.exchange.ExportFormat
+import com.fungast.app.exchange.encodeSpotQr
 import com.fungast.app.exchange.encodeSpots
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -86,6 +87,27 @@ class SpotExchangeViewModelTest {
         viewModel.import("non è un file")
 
         assertEquals(ExchangeMessage.ImportFailed, viewModel.message.value)
+        assertTrue(dao.spots.value.isEmpty())
+    }
+
+    @Test
+    fun scannedSpotIsAddedOnce() {
+        val qr = encodeSpotQr(spot("Faggeta"))
+
+        viewModel.importQr(qr)
+        assertEquals(ExchangeMessage.QrImported("Faggeta"), viewModel.message.value)
+
+        viewModel.importQr(qr)
+        assertEquals(ExchangeMessage.QrAlreadySaved("Faggeta"), viewModel.message.value)
+        assertEquals(1, dao.spots.value.size)
+    }
+
+    @Test
+    fun scannedBackupWithManySpotsIsRejected() {
+        // A QR holds a single spot; a multi-spot file is not a valid code
+        viewModel.importQr(encodeSpots(listOf(spot("A"), spot("B", latitude = 45.0)), ExportFormat.FUNGAST, now))
+
+        assertEquals(ExchangeMessage.QrInvalid, viewModel.message.value)
         assertTrue(dao.spots.value.isEmpty())
     }
 

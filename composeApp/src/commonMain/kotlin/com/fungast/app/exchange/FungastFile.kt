@@ -38,26 +38,30 @@ private val json = Json {
     explicitNulls = false
 }
 
-internal fun encodeFungast(spots: List<Spot>, exportedAt: Instant): String = json.encodeToString(
-    FungastFileDto.serializer(),
-    FungastFileDto(
-        format = FORMAT_ID,
-        version = FORMAT_VERSION,
-        exportedAt = exportedAt,
-        spots = spots.map {
-            SpotDto(
-                name = it.name,
-                category = it.category.name,
-                latitude = it.latitude,
-                longitude = it.longitude,
-                altitude = it.altitude,
-                accuracyMeters = it.accuracyMeters,
-                notes = it.notes,
-                createdAt = Instant.fromEpochMilliseconds(it.createdAt),
-            )
-        },
-    ),
-)
+// Single line: a QR code has no room for indentation
+private val compactJson = Json(json) { prettyPrint = false }
+
+internal fun encodeFungast(spots: List<Spot>, exportedAt: Instant?, compact: Boolean = false): String =
+    (if (compact) compactJson else json).encodeToString(
+        FungastFileDto.serializer(),
+        FungastFileDto(
+            format = FORMAT_ID,
+            version = FORMAT_VERSION,
+            exportedAt = exportedAt,
+            spots = spots.map {
+                SpotDto(
+                    name = it.name,
+                    category = it.category.name,
+                    latitude = it.latitude,
+                    longitude = it.longitude,
+                    altitude = it.altitude,
+                    accuracyMeters = it.accuracyMeters,
+                    notes = it.notes,
+                    createdAt = Instant.fromEpochMilliseconds(it.createdAt),
+                )
+            },
+        ),
+    )
 
 internal fun decodeFungast(text: String): List<Spot> {
     val file = try {

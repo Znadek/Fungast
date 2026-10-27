@@ -10,6 +10,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fungast.app.data.SpotDao
 import com.fungast.app.exchange.FileExchange
+import com.fungast.app.exchange.QrScanner
+import com.fungast.app.exchange.isSpotQr
 import com.fungast.app.location.HeadingProvider
 import com.fungast.app.location.LinkResolver
 import com.fungast.app.location.LocationProvider
@@ -34,6 +36,7 @@ fun App(
     linkResolver: LinkResolver,
     offlineMaps: OfflineMaps,
     fileExchange: FileExchange,
+    qrScanner: QrScanner,
     /** Text shared to the app from another one (e.g. a Google Maps link): opens "new spot" with it. */
     sharedText: String? = null,
 ) {
@@ -72,6 +75,18 @@ fun App(
                     },
                     onImport = {
                         scope.launch { fileExchange.pickTextFile()?.let(exchangeViewModel::import) }
+                    },
+                    onScanQr = {
+                        scope.launch {
+                            val text = qrScanner.scan() ?: return@launch
+                            if (isSpotQr(text)) {
+                                exchangeViewModel.importQr(text)
+                            } else {
+                                // Any other code (e.g. a Google Maps link) may still hold a position
+                                initialLinkText = text
+                                screen = Screen.AddSpot
+                            }
+                        }
                     },
                     onExchangeMessageShown = exchangeViewModel::messageShown,
                 )

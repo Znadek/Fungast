@@ -97,6 +97,7 @@ private fun SpotItem(spot: Spot, onGoTo: () -> Unit, onDelete: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             SpotSummary(spot, modifier = Modifier.weight(1f))
+            ShowSpotQrButton(spot)
             GoToSpotButton(onClick = onGoTo)
             IconButton(onClick = onDelete) {
                 Icon(Icons.Outlined.Delete, contentDescription = "Elimina")

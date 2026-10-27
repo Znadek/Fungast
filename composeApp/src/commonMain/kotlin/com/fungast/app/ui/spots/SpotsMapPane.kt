@@ -62,6 +62,7 @@ fun SpotsMapPane(
                         verticalAlignment = Alignment.Top,
                     ) {
                         SpotSummary(spot, modifier = Modifier.weight(1f))
+                        ShowSpotQrButton(spot)
                         GoToSpotButton(onClick = { onGoToSpot(spot) })
                         IconButton(onClick = { selectedSpotId = null }) {
                             Icon(Icons.Filled.Close, contentDescription = "Chiudi")

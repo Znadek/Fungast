@@ -22,6 +22,9 @@ sealed interface ExchangeMessage {
     data object NothingToExport : ExchangeMessage
     data class Imported(val added: Int, val alreadyPresent: Int) : ExchangeMessage
     data object ImportFailed : ExchangeMessage
+    data class QrImported(val spotName: String) : ExchangeMessage
+    data class QrAlreadySaved(val spotName: String) : ExchangeMessage
+    data object QrInvalid : ExchangeMessage
 }
 
 /**
@@ -55,21 +58,43 @@ class SpotExchangeViewModel(
     /** Adds the spots in [fileText], skipping those already saved (e.g. when importing the same backup twice). */
     fun import(fileText: String) {
         viewModelScope.launch {
-            val imported = try {
-                decodeSpots(fileText, now = clock.now())
-            } catch (e: SpotFileException) {
+            val imported = decodeOrNull(fileText) ?: run {
                 _message.value = ExchangeMessage.ImportFailed
                 return@launch
             }
-            val knownKeys = spotDao.getAll().mapTo(mutableSetOf()) { it.duplicateKey() }
-            // add() also drops duplicates inside the file itself
-            val newSpots = imported.filter { knownKeys.add(it.duplicateKey()) }
-            if (newSpots.isNotEmpty()) spotDao.insertAll(newSpots)
-            _message.value = ExchangeMessage.Imported(
-                added = newSpots.size,
-                alreadyPresent = imported.size - newSpots.size,
-            )
+            val added = addNew(imported)
+            _message.value = ExchangeMessage.Imported(added = added, alreadyPresent = imported.size - added)
         }
+    }
+
+    /** Adds the spot in a code made by [com.fungast.app.exchange.encodeSpotQr]. */
+    fun importQr(qrText: String) {
+        viewModelScope.launch {
+            val spot = decodeOrNull(qrText)?.singleOrNull() ?: run {
+                _message.value = ExchangeMessage.QrInvalid
+                return@launch
+            }
+            _message.value = if (addNew(listOf(spot)) == 1) {
+                ExchangeMessage.QrImported(spot.name)
+            } else {
+                ExchangeMessage.QrAlreadySaved(spot.name)
+            }
+        }
+    }
+
+    private fun decodeOrNull(text: String): List<Spot>? = try {
+        decodeSpots(text, now = clock.now())
+    } catch (e: SpotFileException) {
+        null
+    }
+
+    /** Inserts the spots not saved yet and returns how many they were. */
+    private suspend fun addNew(spots: List<Spot>): Int {
+        val knownKeys = spotDao.getAll().mapTo(mutableSetOf()) { it.duplicateKey() }
+        // add() also drops duplicates inside the list itself
+        val newSpots = spots.filter { knownKeys.add(it.duplicateKey()) }
+        if (newSpots.isNotEmpty()) spotDao.insertAll(newSpots)
+        return newSpots.size
     }
 
     fun messageShown() {

@@ -9,6 +9,7 @@ import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,6 +48,7 @@ fun SpotsHomeScreen(
     exchangeMessage: ExchangeMessage?,
     onExport: (ExportFormat) -> Unit,
     onImport: () -> Unit,
+    onScanQr: () -> Unit,
     onExchangeMessageShown: () -> Unit,
 ) {
     var mode by rememberSaveable { mutableStateOf(HomeMode.List) }
@@ -82,7 +84,7 @@ fun SpotsHomeScreen(
                             Icon(Icons.AutoMirrored.Filled.ViewList, contentDescription = "Mostra elenco")
                         }
                     }
-                    ExchangeMenu(onExport = onExport, onImport = onImport)
+                    ExchangeMenu(onExport = onExport, onImport = onImport, onScanQr = onScanQr)
                 },
             )
         },
@@ -114,12 +116,20 @@ fun SpotsHomeScreen(
 }
 
 @Composable
-private fun ExchangeMenu(onExport: (ExportFormat) -> Unit, onImport: () -> Unit) {
+private fun ExchangeMenu(onExport: (ExportFormat) -> Unit, onImport: () -> Unit, onScanQr: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     IconButton(onClick = { expanded = true }) {
         Icon(Icons.Filled.MoreVert, contentDescription = "Altre opzioni")
     }
     DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        DropdownMenuItem(
+            text = { Text("Ricevi posto da QR") },
+            leadingIcon = { Icon(Icons.Outlined.QrCodeScanner, contentDescription = null) },
+            onClick = {
+                expanded = false
+                onScanQr()
+            },
+        )
         DropdownMenuItem(
             text = { Text("Esporta backup (.fungast)") },
             leadingIcon = { Icon(Icons.Outlined.FileUpload, contentDescription = null) },
@@ -150,6 +160,9 @@ private fun ExchangeMenu(onExport: (ExportFormat) -> Unit, onImport: () -> Unit)
 internal fun exchangeMessageText(message: ExchangeMessage): String = when (message) {
     ExchangeMessage.NothingToExport -> "Nessun posto da esportare."
     ExchangeMessage.ImportFailed -> "File non valido: scegli un file .fungast o .gpx."
+    is ExchangeMessage.QrImported -> "Posto \"${message.spotName}\" aggiunto."
+    is ExchangeMessage.QrAlreadySaved -> "Hai già il posto \"${message.spotName}\"."
+    ExchangeMessage.QrInvalid -> "Questo codice QR non contiene un posto Fungast."
     is ExchangeMessage.Imported -> when {
         message.added == 0 && message.alreadyPresent == 0 -> "Nessun posto trovato nel file."
         message.added == 0 -> "Tutti i posti del file sono già salvati."

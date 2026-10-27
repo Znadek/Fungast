@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.fungast.app.exchange.AndroidFileExchange
+import com.fungast.app.exchange.AndroidQrScanner
 import com.fungast.app.location.AndroidHeadingProvider
 import com.fungast.app.location.AndroidLinkResolver
 import com.fungast.app.location.AndroidLocationProvider
@@ -15,6 +16,7 @@ class MainActivity : ComponentActivity() {
     // Must be created before the activity is started, as they register activity-result launchers
     private val locationProvider = AndroidLocationProvider(this)
     private val fileExchange = AndroidFileExchange(this)
+    private val qrScanner = AndroidQrScanner(this)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -30,6 +32,7 @@ class MainActivity : ComponentActivity() {
                 linkResolver = AndroidLinkResolver(),
                 offlineMaps = AndroidOfflineMaps(applicationContext),
                 fileExchange = fileExchange,
+                qrScanner = qrScanner,
                 sharedText = sharedText,
             )
         }

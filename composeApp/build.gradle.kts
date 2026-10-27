@@ -32,6 +32,8 @@ kotlin {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
             implementation(libs.maplibre.android)
+            implementation(libs.zxing.core)
+            implementation(libs.zxing.android.embedded)
         }
         commonMain.dependencies {
             implementation(compose.runtime)

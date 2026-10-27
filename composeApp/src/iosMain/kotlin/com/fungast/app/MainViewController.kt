@@ -6,6 +6,7 @@ import com.fungast.app.data.DATABASE_FILE_NAME
 import com.fungast.app.data.FungastDatabase
 import com.fungast.app.data.buildFungastDatabase
 import com.fungast.app.exchange.IosFileExchange
+import com.fungast.app.exchange.IosQrScanner
 import com.fungast.app.location.IosHeadingProvider
 import com.fungast.app.location.IosLinkResolver
 import com.fungast.app.location.IosLocationProvider
@@ -27,5 +28,6 @@ fun MainViewController() = ComposeUIViewController {
         linkResolver = IosLinkResolver(),
         offlineMaps = IosOfflineMaps(),
         fileExchange = IosFileExchange(),
+        qrScanner = IosQrScanner(),
     )
 }
