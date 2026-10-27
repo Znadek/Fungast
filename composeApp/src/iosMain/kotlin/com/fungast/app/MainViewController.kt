@@ -6,6 +6,7 @@ import com.fungast.app.data.DATABASE_FILE_NAME
 import com.fungast.app.data.FungastDatabase
 import com.fungast.app.data.buildFungastDatabase
 import com.fungast.app.location.IosLocationProvider
+import com.fungast.app.map.IosOfflineMaps
 import platform.Foundation.NSHomeDirectory
 
 private val database: FungastDatabase by lazy {
@@ -16,5 +17,9 @@ private val database: FungastDatabase by lazy {
 
 // Entry point for the future iOS app (Xcode project to be added on macOS)
 fun MainViewController() = ComposeUIViewController {
-    App(spotDao = database.spotDao(), locationProvider = IosLocationProvider())
+    App(
+        spotDao = database.spotDao(),
+        locationProvider = IosLocationProvider(),
+        offlineMaps = IosOfflineMaps(),
+    )
 }

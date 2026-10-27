@@ -9,27 +9,34 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fungast.app.data.SpotDao
 import com.fungast.app.location.LocationProvider
+import com.fungast.app.map.OfflineMaps
 import com.fungast.app.ui.PlatformBackHandler
 import com.fungast.app.ui.spots.AddSpotScreen
-import com.fungast.app.ui.spots.SpotListScreen
+import com.fungast.app.ui.spots.MapDownloadViewModel
+import com.fungast.app.ui.spots.SpotsHomeScreen
 import com.fungast.app.ui.spots.SpotsViewModel
 import com.fungast.app.ui.theme.FungastTheme
 
 private enum class Screen { SpotList, AddSpot }
 
 @Composable
-fun App(spotDao: SpotDao, locationProvider: LocationProvider) {
+fun App(spotDao: SpotDao, locationProvider: LocationProvider, offlineMaps: OfflineMaps) {
     FungastTheme {
         val viewModel = viewModel { SpotsViewModel(spotDao) }
+        val mapDownloadViewModel = viewModel { MapDownloadViewModel(offlineMaps) }
         var screen by rememberSaveable { mutableStateOf(Screen.SpotList) }
 
         when (screen) {
             Screen.SpotList -> {
                 val spots by viewModel.spots.collectAsStateWithLifecycle()
-                SpotListScreen(
+                val downloadState by mapDownloadViewModel.state.collectAsStateWithLifecycle()
+                SpotsHomeScreen(
                     spots = spots,
+                    downloadState = downloadState,
                     onAddSpot = { screen = Screen.AddSpot },
                     onDeleteSpot = viewModel::deleteSpot,
+                    onDownloadArea = mapDownloadViewModel::download,
+                    onDownloadMessageShown = mapDownloadViewModel::messageShown,
                 )
             }
             Screen.AddSpot -> {

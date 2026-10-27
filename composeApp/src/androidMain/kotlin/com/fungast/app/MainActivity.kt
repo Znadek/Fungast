@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.fungast.app.location.AndroidLocationProvider
+import com.fungast.app.map.AndroidOfflineMaps
 
 class MainActivity : ComponentActivity() {
     // Must be created before the activity is started, as it registers a permission launcher
@@ -15,7 +16,11 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         val spotDao = (application as FungastApplication).database.spotDao()
         setContent {
-            App(spotDao = spotDao, locationProvider = locationProvider)
+            App(
+                spotDao = spotDao,
+                locationProvider = locationProvider,
+                offlineMaps = AndroidOfflineMaps(applicationContext),
+            )
         }
     }
 }

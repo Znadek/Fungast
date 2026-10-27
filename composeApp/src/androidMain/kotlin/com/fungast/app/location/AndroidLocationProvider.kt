@@ -4,11 +4,12 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
+import android.os.Build
+import android.os.CancellationSignal
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.core.location.LocationManagerCompat
-import androidx.core.os.CancellationSignal
 import kotlin.coroutines.resume
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -43,17 +44,24 @@ class AndroidLocationProvider(private val activity: ComponentActivity) : Locatio
 
     override suspend fun currentLocation(): GeoPoint? {
         val locationManager = activity.getSystemService(LocationManager::class.java) ?: return null
-        val provider = when {
-            hasPermission(Manifest.permission.ACCESS_FINE_LOCATION) &&
-                locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
-            hasPermission(Manifest.permission.ACCESS_COARSE_LOCATION) &&
-                locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
-            else -> return null
-        }
+        // Tried in order: GPS alone can't get a fix indoors, so fall back to the network provider.
+        // Fused (Android 12+) combines GPS, Wi-Fi and cell, and is fast both indoors and in the woods.
+        val providers = buildList {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                locationManager.hasProvider(LocationManager.FUSED_PROVIDER)
+            ) add(LocationManager.FUSED_PROVIDER)
+            if (hasPermission(Manifest.permission.ACCESS_FINE_LOCATION)) add(LocationManager.GPS_PROVIDER)
+            add(LocationManager.NETWORK_PROVIDER)
+        }.filter { locationManager.isProviderEnabled(it) }
+        if (providers.isEmpty()) return null
+
         // A cold GPS start in the woods can take a while
-        return withTimeoutOrNull(LOCATION_TIMEOUT_MS) {
-            requestSingleFix(locationManager, provider)
-        }?.toGeoPoint()
+        val timeoutPerProvider = LOCATION_TIMEOUT_MS / providers.size
+        for (provider in providers) {
+            withTimeoutOrNull(timeoutPerProvider) { requestSingleFix(locationManager, provider) }
+                ?.let { return it.toGeoPoint() }
+        }
+        return null
     }
 
     @Suppress("MissingPermission") // Checked in currentLocation()
