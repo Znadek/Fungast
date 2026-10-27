@@ -7,6 +7,7 @@ import com.fungast.app.data.FungastDatabase
 import com.fungast.app.data.buildFungastDatabase
 import com.fungast.app.exchange.IosFileExchange
 import com.fungast.app.location.IosHeadingProvider
+import com.fungast.app.location.IosLinkResolver
 import com.fungast.app.location.IosLocationProvider
 import com.fungast.app.map.IosOfflineMaps
 import platform.Foundation.NSHomeDirectory
@@ -23,6 +24,7 @@ fun MainViewController() = ComposeUIViewController {
         spotDao = database.spotDao(),
         locationProvider = IosLocationProvider(),
         headingProvider = IosHeadingProvider(),
+        linkResolver = IosLinkResolver(),
         offlineMaps = IosOfflineMaps(),
         fileExchange = IosFileExchange(),
     )

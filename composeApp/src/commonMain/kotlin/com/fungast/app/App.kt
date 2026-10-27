@@ -11,6 +11,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fungast.app.data.SpotDao
 import com.fungast.app.exchange.FileExchange
 import com.fungast.app.location.HeadingProvider
+import com.fungast.app.location.LinkResolver
 import com.fungast.app.location.LocationProvider
 import com.fungast.app.map.OfflineMaps
 import com.fungast.app.ui.PlatformBackHandler
@@ -30,15 +31,19 @@ fun App(
     spotDao: SpotDao,
     locationProvider: LocationProvider,
     headingProvider: HeadingProvider,
+    linkResolver: LinkResolver,
     offlineMaps: OfflineMaps,
     fileExchange: FileExchange,
+    /** Text shared to the app from another one (e.g. a Google Maps link): opens "new spot" with it. */
+    sharedText: String? = null,
 ) {
     FungastTheme {
         val viewModel = viewModel { SpotsViewModel(spotDao) }
         val mapDownloadViewModel = viewModel { MapDownloadViewModel(offlineMaps) }
         val exchangeViewModel = viewModel { SpotExchangeViewModel(spotDao) }
         val scope = rememberCoroutineScope()
-        var screen by rememberSaveable { mutableStateOf(Screen.SpotList) }
+        var screen by rememberSaveable { mutableStateOf(if (sharedText != null) Screen.AddSpot else Screen.SpotList) }
+        var initialLinkText by rememberSaveable { mutableStateOf(sharedText) }
         var targetSpotId by rememberSaveable { mutableStateOf<Long?>(null) }
 
         val spots by viewModel.spots.collectAsStateWithLifecycle()
@@ -50,7 +55,10 @@ fun App(
                 SpotsHomeScreen(
                     spots = spots,
                     downloadState = downloadState,
-                    onAddSpot = { screen = Screen.AddSpot },
+                    onAddSpot = {
+                        initialLinkText = null
+                        screen = Screen.AddSpot
+                    },
                     onDeleteSpot = viewModel::deleteSpot,
                     onGoToSpot = {
                         targetSpotId = it.id
@@ -72,6 +80,8 @@ fun App(
                 PlatformBackHandler { screen = Screen.SpotList }
                 AddSpotScreen(
                     locationProvider = locationProvider,
+                    linkResolver = linkResolver,
+                    initialLinkText = initialLinkText,
                     onSave = { name, category, notes, location ->
                         viewModel.addSpot(name, category, notes, location)
                         screen = Screen.SpotList

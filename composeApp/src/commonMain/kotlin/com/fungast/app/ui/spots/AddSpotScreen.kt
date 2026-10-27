@@ -13,6 +13,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -25,6 +27,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -37,12 +42,17 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.unit.dp
 import com.fungast.app.data.SpotCategory
 import com.fungast.app.location.GeoPoint
+import com.fungast.app.location.LinkResolver
 import com.fungast.app.location.LocationProvider
+import com.fungast.app.location.MapLinkResult
+import com.fungast.app.location.locationFromMapLink
 import com.fungast.app.ui.formatLatLon
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 sealed interface LocationState {
@@ -56,13 +66,21 @@ sealed interface LocationState {
 @Composable
 fun AddSpotScreen(
     locationProvider: LocationProvider,
+    linkResolver: LinkResolver,
+    /** When set, the screen starts in link mode with this text (shared from another app). */
+    initialLinkText: String?,
     onSave: (name: String, category: SpotCategory, notes: String, location: GeoPoint) -> Unit,
     onBack: () -> Unit,
 ) {
     var name by rememberSaveable { mutableStateOf("") }
     var category by rememberSaveable { mutableStateOf(SpotCategory.MUSHROOMS) }
     var notes by rememberSaveable { mutableStateOf("") }
+    var source by rememberSaveable {
+        mutableStateOf(if (initialLinkText != null) LocationSource.LINK else LocationSource.GPS)
+    }
     var locationState by remember { mutableStateOf<LocationState>(LocationState.Searching) }
+    var linkText by rememberSaveable { mutableStateOf(initialLinkText.orEmpty()) }
+    var linkState by remember { mutableStateOf<LinkState>(LinkState.Empty) }
     val scope = rememberCoroutineScope()
 
     suspend fun locate() {
@@ -74,9 +92,26 @@ fun AddSpotScreen(
         }
     }
 
-    LaunchedEffect(Unit) { locate() }
+    // Switching to the link cancels a GPS search still running
+    LaunchedEffect(source) {
+        if (source == LocationSource.GPS && locationState !is LocationState.Found) locate()
+    }
 
-    val location = (locationState as? LocationState.Found)?.point
+    LaunchedEffect(linkText) {
+        if (linkText.isBlank()) {
+            linkState = LinkState.Empty
+            return@LaunchedEffect
+        }
+        // Wait for the user to stop typing; a paste arrives in one go
+        delay(LINK_DEBOUNCE_MS)
+        linkState = LinkState.Reading
+        linkState = LinkState.Done(locationFromMapLink(linkText, linkResolver))
+    }
+
+    val location = when (source) {
+        LocationSource.GPS -> (locationState as? LocationState.Found)?.point
+        LocationSource.LINK -> ((linkState as? LinkState.Done)?.result as? MapLinkResult.Found)?.point
+    }
     val canSave = name.isNotBlank() && location != null
 
     Scaffold(
@@ -100,8 +135,13 @@ fun AddSpotScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             LocationCard(
-                state = locationState,
+                source = source,
+                onSourceChange = { source = it },
+                gpsState = locationState,
                 onRetry = { scope.launch { locate() } },
+                linkText = linkText,
+                onLinkTextChange = { linkText = it },
+                linkState = linkState,
             )
 
             OutlinedTextField(
@@ -143,44 +183,133 @@ fun AddSpotScreen(
     }
 }
 
+private enum class LocationSource(val label: String) { GPS("GPS"), LINK("Link o coordinate") }
+
+private sealed interface LinkState {
+    data object Empty : LinkState
+    data object Reading : LinkState
+    data class Done(val result: MapLinkResult) : LinkState
+}
+
+private const val LINK_DEBOUNCE_MS = 400L
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun LocationCard(state: LocationState, onRetry: () -> Unit) {
+private fun LocationCard(
+    source: LocationSource,
+    onSourceChange: (LocationSource) -> Unit,
+    gpsState: LocationState,
+    onRetry: () -> Unit,
+    linkText: String,
+    onLinkTextChange: (String) -> Unit,
+    linkState: LinkState,
+) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Posizione", style = MaterialTheme.typography.titleSmall)
-            when (state) {
-                LocationState.Searching -> Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                    Text("Ricerca del segnale GPS…")
-                }
-                LocationState.PermissionDenied ->
-                    Text("Permesso di posizione negato. Concedilo per salvare il posto.")
-                LocationState.Unavailable ->
-                    Text("Posizione non disponibile. Controlla che il GPS sia attivo e riprova all'aperto.")
-                is LocationState.Found -> {
-                    Text(formatLatLon(state.point.latitude, state.point.longitude), style = MaterialTheme.typography.bodyLarge)
-                    val details = listOfNotNull(
-                        state.point.accuracyMeters?.let { "precisione ±${it.roundToInt()} m" },
-                        state.point.altitude?.let { "altitudine ${it.roundToInt()} m" },
-                    )
-                    if (details.isNotEmpty()) {
-                        Text(
-                            details.joinToString(" · "),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                LocationSource.entries.forEach { option ->
+                    SegmentedButton(
+                        selected = option == source,
+                        onClick = { onSourceChange(option) },
+                        shape = SegmentedButtonDefaults.itemShape(option.ordinal, LocationSource.entries.size),
+                    ) { Text(option.label) }
                 }
             }
-            if (state != LocationState.Searching) {
-                OutlinedButton(onClick = onRetry) {
-                    Icon(Icons.Filled.MyLocation, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Text("Aggiorna posizione", modifier = Modifier.padding(start = 8.dp))
-                }
+            when (source) {
+                LocationSource.GPS -> GpsLocation(gpsState, onRetry)
+                LocationSource.LINK -> LinkLocation(linkText, onLinkTextChange, linkState)
             }
         }
+    }
+}
+
+@Composable
+private fun GpsLocation(state: LocationState, onRetry: () -> Unit) {
+    when (state) {
+        LocationState.Searching -> Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+            Text("Ricerca del segnale GPS…")
+        }
+        LocationState.PermissionDenied ->
+            Text("Permesso di posizione negato. Concedilo per salvare il posto.")
+        LocationState.Unavailable ->
+            Text("Posizione non disponibile. Controlla che il GPS sia attivo e riprova all'aperto.")
+        is LocationState.Found -> FoundPoint(state.point)
+    }
+    if (state != LocationState.Searching) {
+        OutlinedButton(onClick = onRetry) {
+            Icon(Icons.Filled.MyLocation, contentDescription = null, modifier = Modifier.size(18.dp))
+            Text("Aggiorna posizione", modifier = Modifier.padding(start = 8.dp))
+        }
+    }
+}
+
+@Composable
+private fun LinkLocation(text: String, onTextChange: (String) -> Unit, state: LinkState) {
+    val clipboard = LocalClipboardManager.current
+    OutlinedTextField(
+        value = text,
+        onValueChange = onTextChange,
+        label = { Text("Link Google Maps o coordinate") },
+        placeholder = { Text("https://maps.app.goo.gl/… o 45.4642, 9.19") },
+        maxLines = 3,
+        trailingIcon = {
+            if (text.isEmpty()) {
+                IconButton(onClick = { clipboard.getText()?.text?.let(onTextChange) }) {
+                    Icon(Icons.Filled.ContentPaste, contentDescription = "Incolla")
+                }
+            } else {
+                IconButton(onClick = { onTextChange("") }) {
+                    Icon(Icons.Filled.Clear, contentDescription = "Cancella")
+                }
+            }
+        },
+        modifier = Modifier.fillMaxWidth(),
+    )
+    val secondary = MaterialTheme.colorScheme.onSurfaceVariant
+    when (state) {
+        LinkState.Empty -> Text(
+            "Su Google Maps tieni premuto sul punto, tocca Condividi e copia il link.",
+            style = MaterialTheme.typography.bodySmall,
+            color = secondary,
+        )
+        LinkState.Reading -> Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+            Text("Lettura del link…")
+        }
+        is LinkState.Done -> when (state.result) {
+            is MapLinkResult.Found -> FoundPoint(state.result.point)
+            MapLinkResult.NotFound -> Text(
+                "Nessuna posizione nel link. Su Google Maps tieni premuto sul punto esatto " +
+                    "(compare una puntina rossa), poi Condividi.",
+            )
+            MapLinkResult.NetworkError -> Text(
+                "Per leggere i link brevi (maps.app.goo.gl) serve la connessione. " +
+                    "Senza rete puoi incollare le coordinate.",
+            )
+        }
+    }
+}
+
+@Composable
+private fun FoundPoint(point: GeoPoint) {
+    Text(formatLatLon(point.latitude, point.longitude), style = MaterialTheme.typography.bodyLarge)
+    val details = listOfNotNull(
+        point.accuracyMeters?.let { "precisione ±${it.roundToInt()} m" },
+        point.altitude?.let { "altitudine ${it.roundToInt()} m" },
+    )
+    if (details.isNotEmpty()) {
+        Text(
+            details.joinToString(" · "),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
