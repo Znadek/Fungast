@@ -2,7 +2,6 @@ package com.fungast.app.ui.spots
 
 import com.fungast.app.data.Spot
 import com.fungast.app.data.SpotCategory
-import com.fungast.app.data.SpotDao
 import com.fungast.app.location.GeoPoint
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -11,34 +10,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
-import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
-
-private class FakeSpotDao : SpotDao {
-    val spots = MutableStateFlow<List<Spot>>(emptyList())
-    private var nextId = 1L
-
-    override fun observeAll(): Flow<List<Spot>> = spots
-
-    override suspend fun insert(spot: Spot): Long {
-        val id = nextId++
-        spots.value = listOf(spot.copy(id = id)) + spots.value
-        return id
-    }
-
-    override suspend fun delete(spot: Spot) {
-        spots.value = spots.value.filterNot { it.id == spot.id }
-    }
-}
-
-private class FixedClock(private val instant: Instant) : Clock {
-    override fun now() = instant
-}
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SpotsViewModelTest {

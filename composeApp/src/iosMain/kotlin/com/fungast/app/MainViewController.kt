@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.fungast.app.data.DATABASE_FILE_NAME
 import com.fungast.app.data.FungastDatabase
 import com.fungast.app.data.buildFungastDatabase
+import com.fungast.app.exchange.IosFileExchange
 import com.fungast.app.location.IosHeadingProvider
 import com.fungast.app.location.IosLocationProvider
 import com.fungast.app.map.IosOfflineMaps
@@ -23,5 +24,6 @@ fun MainViewController() = ComposeUIViewController {
         locationProvider = IosLocationProvider(),
         headingProvider = IosHeadingProvider(),
         offlineMaps = IosOfflineMaps(),
+        fileExchange = IosFileExchange(),
     )
 }

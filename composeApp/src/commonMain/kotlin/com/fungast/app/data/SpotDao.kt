@@ -11,8 +11,14 @@ interface SpotDao {
     @Query("SELECT * FROM spots ORDER BY createdAt DESC")
     fun observeAll(): Flow<List<Spot>>
 
+    @Query("SELECT * FROM spots ORDER BY createdAt DESC")
+    suspend fun getAll(): List<Spot>
+
     @Insert
     suspend fun insert(spot: Spot): Long
+
+    @Insert
+    suspend fun insertAll(spots: List<Spot>)
 
     @Delete
     suspend fun delete(spot: Spot)
