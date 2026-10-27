@@ -46,3 +46,8 @@ captures/
 # macOS / Xcode
 .DS_Store
 xcuserdata/
+
+# Release signing secrets
+keystore.properties
+*.jks
+*.keystore
