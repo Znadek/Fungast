@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
@@ -36,6 +37,7 @@ import com.fungast.app.ui.formatLatLon
 fun SpotList(
     spots: List<Spot>,
     contentPadding: PaddingValues,
+    onGoToSpot: (Spot) -> Unit,
     onDeleteSpot: (Spot) -> Unit,
 ) {
     var spotToDelete by remember { mutableStateOf<Spot?>(null) }
@@ -64,7 +66,7 @@ fun SpotList(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             items(spots, key = { it.id }) { spot ->
-                SpotItem(spot = spot, onDelete = { spotToDelete = spot })
+                SpotItem(spot = spot, onGoTo = { onGoToSpot(spot) }, onDelete = { spotToDelete = spot })
             }
         }
     }
@@ -88,17 +90,26 @@ fun SpotList(
 }
 
 @Composable
-private fun SpotItem(spot: Spot, onDelete: () -> Unit) {
+private fun SpotItem(spot: Spot, onGoTo: () -> Unit, onDelete: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             SpotSummary(spot, modifier = Modifier.weight(1f))
+            GoToSpotButton(onClick = onGoTo)
             IconButton(onClick = onDelete) {
                 Icon(Icons.Outlined.Delete, contentDescription = "Elimina")
             }
         }
+    }
+}
+
+/** Opens the compass that guides the user to the spot. */
+@Composable
+fun GoToSpotButton(onClick: () -> Unit) {
+    IconButton(onClick = onClick) {
+        Icon(Icons.Outlined.Explore, contentDescription = "Portami lì")
     }
 }
 

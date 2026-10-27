@@ -8,33 +8,46 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fungast.app.data.SpotDao
+import com.fungast.app.location.HeadingProvider
 import com.fungast.app.location.LocationProvider
 import com.fungast.app.map.OfflineMaps
 import com.fungast.app.ui.PlatformBackHandler
 import com.fungast.app.ui.spots.AddSpotScreen
+import com.fungast.app.ui.spots.GoToSpotScreen
 import com.fungast.app.ui.spots.MapDownloadViewModel
 import com.fungast.app.ui.spots.SpotsHomeScreen
 import com.fungast.app.ui.spots.SpotsViewModel
 import com.fungast.app.ui.theme.FungastTheme
 
-private enum class Screen { SpotList, AddSpot }
+private enum class Screen { SpotList, AddSpot, GoToSpot }
 
 @Composable
-fun App(spotDao: SpotDao, locationProvider: LocationProvider, offlineMaps: OfflineMaps) {
+fun App(
+    spotDao: SpotDao,
+    locationProvider: LocationProvider,
+    headingProvider: HeadingProvider,
+    offlineMaps: OfflineMaps,
+) {
     FungastTheme {
         val viewModel = viewModel { SpotsViewModel(spotDao) }
         val mapDownloadViewModel = viewModel { MapDownloadViewModel(offlineMaps) }
         var screen by rememberSaveable { mutableStateOf(Screen.SpotList) }
+        var targetSpotId by rememberSaveable { mutableStateOf<Long?>(null) }
+
+        val spots by viewModel.spots.collectAsStateWithLifecycle()
 
         when (screen) {
             Screen.SpotList -> {
-                val spots by viewModel.spots.collectAsStateWithLifecycle()
                 val downloadState by mapDownloadViewModel.state.collectAsStateWithLifecycle()
                 SpotsHomeScreen(
                     spots = spots,
                     downloadState = downloadState,
                     onAddSpot = { screen = Screen.AddSpot },
                     onDeleteSpot = viewModel::deleteSpot,
+                    onGoToSpot = {
+                        targetSpotId = it.id
+                        screen = Screen.GoToSpot
+                    },
                     onDownloadArea = mapDownloadViewModel::download,
                     onDownloadMessageShown = mapDownloadViewModel::messageShown,
                 )
@@ -49,6 +62,18 @@ fun App(spotDao: SpotDao, locationProvider: LocationProvider, offlineMaps: Offli
                     },
                     onBack = { screen = Screen.SpotList },
                 )
+            }
+            Screen.GoToSpot -> {
+                PlatformBackHandler { screen = Screen.SpotList }
+                // Null only briefly after process restart, while spots reload from the database
+                spots.find { it.id == targetSpotId }?.let { spot ->
+                    GoToSpotScreen(
+                        spot = spot,
+                        locationProvider = locationProvider,
+                        headingProvider = headingProvider,
+                        onBack = { screen = Screen.SpotList },
+                    )
+                }
             }
         }
     }

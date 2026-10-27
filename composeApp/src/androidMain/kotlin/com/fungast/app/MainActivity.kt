@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import com.fungast.app.location.AndroidHeadingProvider
 import com.fungast.app.location.AndroidLocationProvider
 import com.fungast.app.map.AndroidOfflineMaps
 
@@ -19,6 +20,7 @@ class MainActivity : ComponentActivity() {
             App(
                 spotDao = spotDao,
                 locationProvider = locationProvider,
+                headingProvider = AndroidHeadingProvider(this),
                 offlineMaps = AndroidOfflineMaps(applicationContext),
             )
         }

@@ -34,6 +34,7 @@ fun SpotsHomeScreen(
     downloadState: MapDownloadState,
     onAddSpot: () -> Unit,
     onDeleteSpot: (Spot) -> Unit,
+    onGoToSpot: (Spot) -> Unit,
     onDownloadArea: (MapViewport?) -> Unit,
     onDownloadMessageShown: () -> Unit,
 ) {
@@ -77,11 +78,17 @@ fun SpotsHomeScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
         when (mode) {
-            HomeMode.List -> SpotList(spots = spots, contentPadding = innerPadding, onDeleteSpot = onDeleteSpot)
+            HomeMode.List -> SpotList(
+                spots = spots,
+                contentPadding = innerPadding,
+                onGoToSpot = onGoToSpot,
+                onDeleteSpot = onDeleteSpot,
+            )
             HomeMode.Map -> SpotsMapPane(
                 spots = spots,
                 downloadState = downloadState,
                 onDownloadArea = onDownloadArea,
+                onGoToSpot = onGoToSpot,
                 modifier = Modifier.padding(innerPadding),
             )
         }

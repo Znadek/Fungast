@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.fungast.app.data.DATABASE_FILE_NAME
 import com.fungast.app.data.FungastDatabase
 import com.fungast.app.data.buildFungastDatabase
+import com.fungast.app.location.IosHeadingProvider
 import com.fungast.app.location.IosLocationProvider
 import com.fungast.app.map.IosOfflineMaps
 import platform.Foundation.NSHomeDirectory
@@ -20,6 +21,7 @@ fun MainViewController() = ComposeUIViewController {
     App(
         spotDao = database.spotDao(),
         locationProvider = IosLocationProvider(),
+        headingProvider = IosHeadingProvider(),
         offlineMaps = IosOfflineMaps(),
     )
 }

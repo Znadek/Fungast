@@ -36,6 +36,7 @@ fun SpotsMapPane(
     spots: List<Spot>,
     downloadState: MapDownloadState,
     onDownloadArea: (MapViewport?) -> Unit,
+    onGoToSpot: (Spot) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var viewport by remember { mutableStateOf<MapViewport?>(null) }
@@ -61,6 +62,7 @@ fun SpotsMapPane(
                         verticalAlignment = Alignment.Top,
                     ) {
                         SpotSummary(spot, modifier = Modifier.weight(1f))
+                        GoToSpotButton(onClick = { onGoToSpot(spot) })
                         IconButton(onClick = { selectedSpotId = null }) {
                             Icon(Icons.Filled.Close, contentDescription = "Chiudi")
                         }

@@ -35,4 +35,25 @@ class FormatTest {
         val millis = LocalDateTime(2026, 3, 7, 8, 5).toInstant(TimeZone.UTC).toEpochMilliseconds()
         assertEquals("07/03/2026 08:05", formatDateTime(millis, TimeZone.UTC))
     }
+
+    @Test
+    fun distanceUsesMetersThenKilometers() {
+        assertEquals("0 m", formatDistance(0.2))
+        assertEquals("850 m", formatDistance(849.6))
+        assertEquals("999 m", formatDistance(999.4))
+        assertEquals("1,0 km", formatDistance(999.6))
+        assertEquals("2,4 km", formatDistance(2_449.0))
+        assertEquals("10 km", formatDistance(9_960.0))
+        assertEquals("27 km", formatDistance(26_700.0))
+    }
+
+    @Test
+    fun cardinalDirectionPicksNearestOfEight() {
+        assertEquals("Nord", cardinalDirection(0.0))
+        assertEquals("Nord", cardinalDirection(355.0))
+        assertEquals("Nord-Est", cardinalDirection(30.0))
+        assertEquals("Est", cardinalDirection(90.0))
+        assertEquals("Sud-Ovest", cardinalDirection(225.0))
+        assertEquals("Nord-Ovest", cardinalDirection(-40.0))
+    }
 }
