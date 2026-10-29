@@ -11,6 +11,7 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import kotlinx.datetime.Instant
@@ -19,6 +20,7 @@ import kotlinx.datetime.LocalDate
 @OptIn(ExperimentalCoroutinesApi::class)
 class SpotsViewModelTest {
     private val dao = FakeSpotDao()
+    private val photoStore = FakePhotoStore()
     private val now = Instant.fromEpochMilliseconds(1_790_000_000_000)
 
     @BeforeTest
@@ -29,7 +31,7 @@ class SpotsViewModelTest {
 
     @Test
     fun addSpotStoresTrimmedFieldsLocationAndTimestamp() {
-        val viewModel = SpotsViewModel(dao, FixedClock(now))
+        val viewModel = SpotsViewModel(dao, photoStore, FixedClock(now))
 
         viewModel.addSpot(
             name = "  Faggeta  ",
@@ -53,7 +55,7 @@ class SpotsViewModelTest {
 
     @Test
     fun findDatesAreStoredMostRecentFirst() {
-        val viewModel = SpotsViewModel(dao, FixedClock(now))
+        val viewModel = SpotsViewModel(dao, photoStore, FixedClock(now))
 
         viewModel.addSpot(
             "Faggeta",
@@ -70,7 +72,7 @@ class SpotsViewModelTest {
 
     @Test
     fun singleFindDateIsTheLastOne() {
-        val viewModel = SpotsViewModel(dao, FixedClock(now))
+        val viewModel = SpotsViewModel(dao, photoStore, FixedClock(now))
 
         viewModel.addSpot("Faggeta", setOf(SpotCategory.MUSHROOMS), "", GeoPoint(46.1, 11.2), listOf(LocalDate(2026, 10, 20)))
 
@@ -81,11 +83,48 @@ class SpotsViewModelTest {
 
     @Test
     fun deleteSpotRemovesIt() {
-        val viewModel = SpotsViewModel(dao, FixedClock(now))
+        val viewModel = SpotsViewModel(dao, photoStore, FixedClock(now))
         viewModel.addSpot("Castagneto", setOf(SpotCategory.CHESTNUTS), "", GeoPoint(45.0, 9.0))
 
         viewModel.deleteSpot(dao.spots.value.single())
 
         assertTrue(dao.spots.value.isEmpty())
+    }
+
+    @Test
+    fun photosCanBeAddedAndRemovedOnASavedSpot() = runTest {
+        val viewModel = SpotsViewModel(dao, photoStore, FixedClock(now))
+        val first = photoStore.save(byteArrayOf(1))
+        val second = photoStore.save(byteArrayOf(2))
+        viewModel.addSpot("Faggeta", setOf(SpotCategory.MUSHROOMS), "", GeoPoint(46.1, 11.2), photos = listOf(first))
+        val id = dao.spots.value.single().id
+
+        viewModel.addPhotos(id, listOf(second))
+        assertEquals(listOf(first, second), dao.spots.value.single().photos)
+
+        viewModel.removePhoto(id, first)
+        assertEquals(listOf(second), dao.spots.value.single().photos)
+        assertEquals(setOf(second), photoStore.files.keys)
+    }
+
+    @Test
+    fun deletingASpotDeletesItsPhotos() = runTest {
+        val viewModel = SpotsViewModel(dao, photoStore, FixedClock(now))
+        val photo = photoStore.save(byteArrayOf(1))
+        viewModel.addSpot("Faggeta", setOf(SpotCategory.MUSHROOMS), "", GeoPoint(46.1, 11.2), photos = listOf(photo))
+
+        viewModel.deleteSpot(dao.spots.value.single())
+
+        assertTrue(photoStore.files.isEmpty())
+    }
+
+    @Test
+    fun discardedPhotosAreDeleted() = runTest {
+        val viewModel = SpotsViewModel(dao, photoStore, FixedClock(now))
+        val photo = photoStore.save(byteArrayOf(1))
+
+        viewModel.discardPhotos(listOf(photo))
+
+        assertTrue(photoStore.files.isEmpty())
     }
 }

@@ -14,8 +14,12 @@ import kotlinx.coroutines.IO
 
 @Database(
     entities = [Spot::class],
-    version = 2,
-    autoMigrations = [AutoMigration(from = 1, to = 2, spec = MultipleCategoriesMigration::class)],
+    version = 3,
+    autoMigrations = [
+        AutoMigration(from = 1, to = 2, spec = MultipleCategoriesMigration::class),
+        // Version 3: photos
+        AutoMigration(from = 2, to = 3),
+    ],
 )
 @TypeConverters(Converters::class)
 @ConstructedBy(FungastDatabaseConstructor::class)

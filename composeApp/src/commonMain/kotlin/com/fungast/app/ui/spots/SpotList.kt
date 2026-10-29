@@ -42,6 +42,7 @@ fun SpotList(
     contentPadding: PaddingValues,
     onGoToSpot: (Spot) -> Unit,
     onDeleteSpot: (Spot) -> Unit,
+    photoActions: (Spot) -> PhotoActions,
 ) {
     var spotToDelete by remember { mutableStateOf<Spot?>(null) }
 
@@ -69,7 +70,12 @@ fun SpotList(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             items(spots, key = { it.id }) { spot ->
-                SpotItem(spot = spot, onGoTo = { onGoToSpot(spot) }, onDelete = { spotToDelete = spot })
+                SpotItem(
+                    spot = spot,
+                    photoActions = photoActions(spot),
+                    onGoTo = { onGoToSpot(spot) },
+                    onDelete = { spotToDelete = spot },
+                )
             }
         }
     }
@@ -78,7 +84,15 @@ fun SpotList(
         AlertDialog(
             onDismissRequest = { spotToDelete = null },
             title = { Text("Eliminare \"${spot.name}\"?") },
-            text = { Text("Il posto verrà cancellato definitivamente.") },
+            text = {
+                Text(
+                    if (spot.photos.isEmpty()) {
+                        "Il posto verrà cancellato definitivamente."
+                    } else {
+                        "Il posto e le sue foto verranno cancellati definitivamente."
+                    },
+                )
+            },
             confirmButton = {
                 TextButton(onClick = {
                     onDeleteSpot(spot)
@@ -93,18 +107,23 @@ fun SpotList(
 }
 
 @Composable
-private fun SpotItem(spot: Spot, onGoTo: () -> Unit, onDelete: () -> Unit) {
+private fun SpotItem(spot: Spot, photoActions: PhotoActions, onGoTo: () -> Unit, onDelete: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            SpotSummary(spot, modifier = Modifier.weight(1f))
-            ShowSpotQrButton(spot)
-            GoToSpotButton(onClick = onGoTo)
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Outlined.Delete, contentDescription = "Elimina")
+        Column(modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SpotSummary(spot, modifier = Modifier.weight(1f))
+                ShowSpotQrButton(spot)
+                GoToSpotButton(onClick = onGoTo)
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Outlined.Delete, contentDescription = "Elimina")
+                }
             }
+            SpotPhotos(
+                photos = spot.photos,
+                actions = photoActions,
+                thumbnailSize = 56.dp,
+                modifier = Modifier.padding(top = 8.dp, end = 12.dp),
+            )
         }
     }
 }

@@ -56,6 +56,8 @@ import com.fungast.app.location.LinkResolver
 import com.fungast.app.location.LocationProvider
 import com.fungast.app.location.MapLinkResult
 import com.fungast.app.location.locationFromMapLink
+import com.fungast.app.photos.PhotoPicker
+import com.fungast.app.ui.PlatformBackHandler
 import com.fungast.app.ui.formatDate
 import com.fungast.app.ui.formatLatLon
 import kotlin.math.roundToInt
@@ -83,13 +85,17 @@ fun AddSpotScreen(
     linkResolver: LinkResolver,
     /** When set, the screen starts in link mode with this text (shared from another app). */
     initialLinkText: String?,
+    photoPicker: PhotoPicker,
     onSave: (
         name: String,
         categories: Set<SpotCategory>,
         notes: String,
         findDates: List<LocalDate>,
+        photos: List<String>,
         location: GeoPoint,
     ) -> Unit,
+    /** Photos are stored as soon as they are taken: these were removed or left unsaved and can be deleted. */
+    onDiscardPhotos: (List<String>) -> Unit,
     onBack: () -> Unit,
 ) {
     var name by rememberSaveable { mutableStateOf("") }
@@ -98,6 +104,7 @@ fun AddSpotScreen(
     // Kept as the date picker's UTC millis: LocalDate cannot be saved in the instance state
     var lastFoundMillis by rememberSaveable { mutableStateOf<Long?>(null) }
     var previousFoundMillis by rememberSaveable { mutableStateOf<Long?>(null) }
+    var photos by rememberSaveable { mutableStateOf(listOf<String>()) }
     var source by rememberSaveable {
         mutableStateOf(if (initialLinkText != null) LocationSource.LINK else LocationSource.GPS)
     }
@@ -136,13 +143,26 @@ fun AddSpotScreen(
         LocationSource.LINK -> ((linkState as? LinkState.Done)?.result as? MapLinkResult.Found)?.point
     }
     val canSave = name.isNotBlank() && categories.isNotEmpty() && location != null
+    val leave = {
+        onDiscardPhotos(photos)
+        onBack()
+    }
+    PlatformBackHandler(onBack = leave)
+    val photoActions = PhotoActions(
+        onTakePhoto = { scope.launch { photoPicker.takePhoto()?.let { photos = photos + it } } },
+        onPickPhotos = { scope.launch { photos = photos + photoPicker.pickPhotos() } },
+        onRemovePhoto = { photo ->
+            photos = photos - photo
+            onDiscardPhotos(listOf(photo))
+        },
+    )
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Nuovo posto") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = leave) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro")
                     }
                 },
@@ -212,6 +232,11 @@ fun AddSpotScreen(
                 )
             }
 
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Foto (facoltativo)", style = MaterialTheme.typography.titleSmall)
+                SpotPhotos(photos = photos, actions = photoActions, thumbnailSize = 72.dp)
+            }
+
             OutlinedTextField(
                 value = notes,
                 onValueChange = { notes = it },
@@ -224,7 +249,7 @@ fun AddSpotScreen(
                 onClick = {
                     location?.let {
                         val findDates = listOfNotNull(lastFoundMillis, previousFoundMillis).map(::utcMillisToDate)
-                        onSave(name, categories, notes, findDates, it)
+                        onSave(name, categories, notes, findDates, photos, it)
                     }
                 },
                 enabled = canSave,

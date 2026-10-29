@@ -11,6 +11,8 @@ import com.fungast.app.location.IosHeadingProvider
 import com.fungast.app.location.IosLinkResolver
 import com.fungast.app.location.IosLocationProvider
 import com.fungast.app.map.IosOfflineMaps
+import com.fungast.app.photos.IosPhotoPicker
+import com.fungast.app.photos.IosPhotoStore
 import platform.Foundation.NSHomeDirectory
 
 private val database: FungastDatabase by lazy {
@@ -29,5 +31,7 @@ fun MainViewController() = ComposeUIViewController {
         offlineMaps = IosOfflineMaps(),
         fileExchange = IosFileExchange(),
         qrScanner = IosQrScanner(),
+        photoStore = IosPhotoStore(),
+        photoPicker = IosPhotoPicker(),
     )
 }

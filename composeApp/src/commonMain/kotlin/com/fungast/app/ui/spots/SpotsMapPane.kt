@@ -37,6 +37,7 @@ fun SpotsMapPane(
     downloadState: MapDownloadState,
     onDownloadArea: (MapViewport?) -> Unit,
     onGoToSpot: (Spot) -> Unit,
+    photoActions: (Spot) -> PhotoActions,
     modifier: Modifier = Modifier,
 ) {
     var viewport by remember { mutableStateOf<MapViewport?>(null) }
@@ -57,16 +58,21 @@ fun SpotsMapPane(
         ) {
             selectedSpot?.let { spot ->
                 Card(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
-                        verticalAlignment = Alignment.Top,
-                    ) {
-                        SpotSummary(spot, modifier = Modifier.weight(1f))
-                        ShowSpotQrButton(spot)
-                        GoToSpotButton(onClick = { onGoToSpot(spot) })
-                        IconButton(onClick = { selectedSpotId = null }) {
-                            Icon(Icons.Filled.Close, contentDescription = "Chiudi")
+                    Column(modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp)) {
+                        Row(verticalAlignment = Alignment.Top) {
+                            SpotSummary(spot, modifier = Modifier.weight(1f))
+                            ShowSpotQrButton(spot)
+                            GoToSpotButton(onClick = { onGoToSpot(spot) })
+                            IconButton(onClick = { selectedSpotId = null }) {
+                                Icon(Icons.Filled.Close, contentDescription = "Chiudi")
+                            }
                         }
+                        SpotPhotos(
+                            photos = spot.photos,
+                            actions = photoActions(spot),
+                            thumbnailSize = 56.dp,
+                            modifier = Modifier.padding(top = 8.dp, end = 12.dp),
+                        )
                     }
                 }
             }

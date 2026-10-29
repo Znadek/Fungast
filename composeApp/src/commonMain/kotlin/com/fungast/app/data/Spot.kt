@@ -1,5 +1,6 @@
 package com.fungast.app.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import kotlinx.datetime.LocalDate
@@ -21,6 +22,8 @@ data class Spot(
     val lastFoundOn: LocalDate? = null,
     /** Find before [lastFoundOn]; only set when [lastFoundOn] is. */
     val previousFoundOn: LocalDate? = null,
+    /** File names in the [com.fungast.app.photos.PhotoStore], oldest first. */
+    @ColumnInfo(defaultValue = "") val photos: List<String> = emptyList(),
 )
 
 enum class SpotCategory(val label: String) {

@@ -9,6 +9,7 @@ import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -43,10 +44,11 @@ fun SpotsHomeScreen(
     onAddSpot: () -> Unit,
     onDeleteSpot: (Spot) -> Unit,
     onGoToSpot: (Spot) -> Unit,
+    photoActions: (Spot) -> PhotoActions,
     onDownloadArea: (MapViewport?) -> Unit,
     onDownloadMessageShown: () -> Unit,
     exchangeMessage: ExchangeMessage?,
-    onExport: (ExportFormat) -> Unit,
+    onExport: (format: ExportFormat, includePhotos: Boolean) -> Unit,
     onImport: () -> Unit,
     onScanQr: () -> Unit,
     onExchangeMessageShown: () -> Unit,
@@ -103,12 +105,14 @@ fun SpotsHomeScreen(
                 contentPadding = innerPadding,
                 onGoToSpot = onGoToSpot,
                 onDeleteSpot = onDeleteSpot,
+                photoActions = photoActions,
             )
             HomeMode.Map -> SpotsMapPane(
                 spots = spots,
                 downloadState = downloadState,
                 onDownloadArea = onDownloadArea,
                 onGoToSpot = onGoToSpot,
+                photoActions = photoActions,
                 modifier = Modifier.padding(innerPadding),
             )
         }
@@ -116,7 +120,7 @@ fun SpotsHomeScreen(
 }
 
 @Composable
-private fun ExchangeMenu(onExport: (ExportFormat) -> Unit, onImport: () -> Unit, onScanQr: () -> Unit) {
+private fun ExchangeMenu(onExport: (ExportFormat, Boolean) -> Unit, onImport: () -> Unit, onScanQr: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     IconButton(onClick = { expanded = true }) {
         Icon(Icons.Filled.MoreVert, contentDescription = "Altre opzioni")
@@ -135,7 +139,15 @@ private fun ExchangeMenu(onExport: (ExportFormat) -> Unit, onImport: () -> Unit,
             leadingIcon = { Icon(Icons.Outlined.FileUpload, contentDescription = null) },
             onClick = {
                 expanded = false
-                onExport(ExportFormat.FUNGAST)
+                onExport(ExportFormat.FUNGAST, false)
+            },
+        )
+        DropdownMenuItem(
+            text = { Text("Esporta backup con foto (.fungast)") },
+            leadingIcon = { Icon(Icons.Outlined.PhotoLibrary, contentDescription = null) },
+            onClick = {
+                expanded = false
+                onExport(ExportFormat.FUNGAST, true)
             },
         )
         DropdownMenuItem(
@@ -143,7 +155,7 @@ private fun ExchangeMenu(onExport: (ExportFormat) -> Unit, onImport: () -> Unit,
             leadingIcon = { Icon(Icons.Outlined.Share, contentDescription = null) },
             onClick = {
                 expanded = false
-                onExport(ExportFormat.GPX)
+                onExport(ExportFormat.GPX, false)
             },
         )
         DropdownMenuItem(

@@ -33,4 +33,12 @@ class ConvertersTest {
         assertEquals(date, converters.textToDate("2026-10-20"))
         assertEquals(null, converters.textToDate(null))
     }
+
+    @Test
+    fun photosRoundTrip() {
+        val photos = listOf("a.jpg", "b.jpg")
+
+        assertEquals(photos, converters.textToPhotos(converters.photosToText(photos)))
+        assertEquals(emptyList(), converters.textToPhotos(""))
+    }
 }

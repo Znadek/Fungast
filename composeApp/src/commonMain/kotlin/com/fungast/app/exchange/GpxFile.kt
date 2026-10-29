@@ -28,7 +28,7 @@ internal fun encodeGpx(spots: List<Spot>, exportedAt: Instant): String = buildSt
 
 private val WAYPOINT = Regex("""<wpt\b([^>]*?)(?:/>|>([\s\S]*?)</wpt>)""")
 
-internal fun decodeGpx(text: String, now: Instant): List<Spot> {
+internal fun decodeGpx(text: String, now: Instant): List<DecodedSpot> {
     if (!text.contains("<gpx")) throw SpotFileException("Non è un file GPX")
     return WAYPOINT.findAll(text).mapNotNull { match ->
         val attributes = match.groupValues[1]
@@ -36,7 +36,7 @@ internal fun decodeGpx(text: String, now: Instant): List<Spot> {
         val latitude = attribute(attributes, "lat")?.toDoubleOrNull() ?: return@mapNotNull null
         val longitude = attribute(attributes, "lon")?.toDoubleOrNull() ?: return@mapNotNull null
         val type = child(body, "type")
-        Spot(
+        val spot = Spot(
             name = child(body, "name")?.ifEmpty { null } ?: DEFAULT_IMPORTED_NAME,
             categories = type.orEmpty().split(",").map { it.trim() }.filter { it.isNotEmpty() }
                 .map { part ->
@@ -53,6 +53,7 @@ internal fun decodeGpx(text: String, now: Instant): List<Spot> {
             createdAt = (child(body, "time")?.let { runCatching { Instant.parse(it) }.getOrNull() } ?: now)
                 .toEpochMilliseconds(),
         )
+        DecodedSpot(spot)
     }.toList()
 }
 
