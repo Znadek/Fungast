@@ -22,6 +22,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.fungast.app.data.Spot
+import com.fungast.app.data.mainCategory
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
@@ -171,7 +172,7 @@ private fun List<Spot>.toFeatureCollection(): FeatureCollection =
             Feature.fromGeometry(Point.fromLngLat(spot.longitude, spot.latitude)).apply {
                 addNumberProperty("id", spot.id)
                 addStringProperty("name", spot.name)
-                addStringProperty("color", spot.category.markerColorHex)
+                addStringProperty("color", spot.mainCategory.markerColorHex)
             }
         }
     )

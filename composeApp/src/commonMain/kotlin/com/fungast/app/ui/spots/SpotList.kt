@@ -30,6 +30,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.fungast.app.data.Spot
+import com.fungast.app.data.findDates
+import com.fungast.app.data.sortedCategories
+import com.fungast.app.ui.formatDate
 import com.fungast.app.ui.formatDateTime
 import com.fungast.app.ui.formatLatLon
 
@@ -114,16 +117,24 @@ fun GoToSpotButton(onClick: () -> Unit) {
     }
 }
 
-/** Name, category, date, coordinates and notes of a spot; shared by the list and the map. */
+/** Name, categories, dates, coordinates and notes of a spot; shared by the list and the map. */
 @Composable
 fun SpotSummary(spot: Spot, modifier: Modifier = Modifier) {
     Column(modifier = modifier) {
         Text(spot.name, style = MaterialTheme.typography.titleMedium)
         Text(
-            "${spot.category.label} · ${formatDateTime(spot.createdAt)}",
+            "${spot.sortedCategories.joinToString(", ") { it.label }} · ${formatDateTime(spot.createdAt)}",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        if (spot.findDates.isNotEmpty()) {
+            Text(
+                (if (spot.findDates.size == 1) "Ultimo ritrovamento: " else "Ultimi ritrovamenti: ") +
+                    spot.findDates.joinToString(", ") { formatDate(it) },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         Text(
             formatLatLon(spot.latitude, spot.longitude),
             style = MaterialTheme.typography.bodySmall,

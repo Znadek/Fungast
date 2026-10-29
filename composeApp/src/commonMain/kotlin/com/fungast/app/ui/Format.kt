@@ -3,6 +3,7 @@ package com.fungast.app.ui
 import kotlin.math.abs
 import kotlin.math.roundToLong
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
@@ -39,3 +40,7 @@ fun formatDateTime(epochMillis: Long, timeZone: TimeZone = TimeZone.currentSyste
     fun Int.pad() = toString().padStart(2, '0')
     return "${dt.dayOfMonth.pad()}/${dt.monthNumber.pad()}/${dt.year} ${dt.hour.pad()}:${dt.minute.pad()}"
 }
+
+/** Formats a date as dd/MM/yyyy. */
+fun formatDate(date: LocalDate): String =
+    "${date.dayOfMonth.toString().padStart(2, '0')}/${date.monthNumber.toString().padStart(2, '0')}/${date.year}"

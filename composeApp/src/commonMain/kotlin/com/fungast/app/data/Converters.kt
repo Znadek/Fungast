@@ -1,0 +1,23 @@
+package com.fungast.app.data
+
+import androidx.room.TypeConverter
+import kotlinx.datetime.LocalDate
+
+/** Stores categories as comma-separated enum names, so a single-category row from version 1 reads unchanged. */
+class Converters {
+    @TypeConverter
+    fun categoriesToText(categories: Set<SpotCategory>): String =
+        categories.sortedBy { it.ordinal }.joinToString(",") { it.name }
+
+    @TypeConverter
+    fun textToCategories(text: String): Set<SpotCategory> =
+        text.split(",").mapNotNull { name -> SpotCategory.entries.find { it.name == name.trim() } }.toSet()
+            .ifEmpty { setOf(SpotCategory.OTHER) }
+
+    /** ISO yyyy-MM-dd. */
+    @TypeConverter
+    fun dateToText(date: LocalDate?): String? = date?.toString()
+
+    @TypeConverter
+    fun textToDate(text: String?): LocalDate? = text?.let(LocalDate::parse)
+}

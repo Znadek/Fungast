@@ -2,7 +2,10 @@ package com.fungast.app.exchange
 
 import com.fungast.app.data.Spot
 import com.fungast.app.data.SpotCategory
+import com.fungast.app.data.lastTwoFinds
+import com.fungast.app.data.sortedCategories
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -22,13 +25,17 @@ private data class FungastFileDto(
 @Serializable
 private data class SpotDto(
     val name: String,
-    val category: String,
+    /** First of [categories]; still written because app versions before multiple categories require it. */
+    val category: String? = null,
+    val categories: List<String> = emptyList(),
     val latitude: Double,
     val longitude: Double,
     val altitude: Double? = null,
     val accuracyMeters: Float? = null,
     val notes: String = "",
     val createdAt: Instant,
+    val lastFoundOn: LocalDate? = null,
+    val previousFoundOn: LocalDate? = null,
 )
 
 private val json = Json {
@@ -51,13 +58,16 @@ internal fun encodeFungast(spots: List<Spot>, exportedAt: Instant?, compact: Boo
             spots = spots.map {
                 SpotDto(
                     name = it.name,
-                    category = it.category.name,
+                    category = it.sortedCategories.firstOrNull()?.name,
+                    categories = it.sortedCategories.map { category -> category.name },
                     latitude = it.latitude,
                     longitude = it.longitude,
                     altitude = it.altitude,
                     accuracyMeters = it.accuracyMeters,
                     notes = it.notes,
                     createdAt = Instant.fromEpochMilliseconds(it.createdAt),
+                    lastFoundOn = it.lastFoundOn,
+                    previousFoundOn = it.previousFoundOn,
                 )
             },
         ),
@@ -73,15 +83,21 @@ internal fun decodeFungast(text: String): List<Spot> {
     }
     if (file.format != FORMAT_ID) throw SpotFileException("Non è un file Fungast")
     return file.spots.map {
+        val (lastFoundOn, previousFoundOn) = lastTwoFinds(listOfNotNull(it.lastFoundOn, it.previousFoundOn))
         Spot(
             name = it.name.trim().ifEmpty { DEFAULT_IMPORTED_NAME },
-            category = SpotCategory.entries.find { category -> category.name == it.category } ?: SpotCategory.OTHER,
+            categories = it.categories.ifEmpty { listOfNotNull(it.category) }
+                .map { name -> SpotCategory.entries.find { category -> category.name == name } ?: SpotCategory.OTHER }
+                .toSet()
+                .ifEmpty { setOf(SpotCategory.OTHER) },
             latitude = it.latitude,
             longitude = it.longitude,
             altitude = it.altitude,
             accuracyMeters = it.accuracyMeters,
             notes = it.notes.trim(),
             createdAt = it.createdAt.toEpochMilliseconds(),
+            lastFoundOn = lastFoundOn,
+            previousFoundOn = previousFoundOn,
         )
     }
 }

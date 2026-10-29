@@ -2,6 +2,7 @@ package com.fungast.app.exchange
 
 import com.fungast.app.data.Spot
 import com.fungast.app.data.SpotCategory
+import com.fungast.app.data.sortedCategories
 import kotlin.math.abs
 import kotlin.math.roundToLong
 import kotlinx.datetime.Instant
@@ -19,7 +20,7 @@ internal fun encodeGpx(spots: List<Spot>, exportedAt: Instant): String = buildSt
         appendLine("    <time>${Instant.fromEpochMilliseconds(spot.createdAt)}</time>")
         appendLine("    <name>${escapeXml(spot.name)}</name>")
         if (spot.notes.isNotEmpty()) appendLine("    <desc>${escapeXml(spot.notes)}</desc>")
-        appendLine("    <type>${escapeXml(spot.category.label)}</type>")
+        appendLine("    <type>${escapeXml(spot.sortedCategories.joinToString(", ") { it.label })}</type>")
         appendLine("  </wpt>")
     }
     appendLine("</gpx>")
@@ -37,8 +38,13 @@ internal fun decodeGpx(text: String, now: Instant): List<Spot> {
         val type = child(body, "type")
         Spot(
             name = child(body, "name")?.ifEmpty { null } ?: DEFAULT_IMPORTED_NAME,
-            category = SpotCategory.entries.find { type.equals(it.label, ignoreCase = true) || type == it.name }
-                ?: SpotCategory.OTHER,
+            categories = type.orEmpty().split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                .map { part ->
+                    SpotCategory.entries.find { part.equals(it.label, ignoreCase = true) || part == it.name }
+                        ?: SpotCategory.OTHER
+                }
+                .toSet()
+                .ifEmpty { setOf(SpotCategory.OTHER) },
             latitude = latitude,
             longitude = longitude,
             altitude = child(body, "ele")?.toDoubleOrNull(),

@@ -15,10 +15,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -29,9 +32,12 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -50,10 +56,18 @@ import com.fungast.app.location.LinkResolver
 import com.fungast.app.location.LocationProvider
 import com.fungast.app.location.MapLinkResult
 import com.fungast.app.location.locationFromMapLink
+import com.fungast.app.ui.formatDate
 import com.fungast.app.ui.formatLatLon
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.toLocalDateTime
+import kotlinx.datetime.todayIn
 
 sealed interface LocationState {
     data object Searching : LocationState
@@ -69,12 +83,21 @@ fun AddSpotScreen(
     linkResolver: LinkResolver,
     /** When set, the screen starts in link mode with this text (shared from another app). */
     initialLinkText: String?,
-    onSave: (name: String, category: SpotCategory, notes: String, location: GeoPoint) -> Unit,
+    onSave: (
+        name: String,
+        categories: Set<SpotCategory>,
+        notes: String,
+        findDates: List<LocalDate>,
+        location: GeoPoint,
+    ) -> Unit,
     onBack: () -> Unit,
 ) {
     var name by rememberSaveable { mutableStateOf("") }
-    var category by rememberSaveable { mutableStateOf(SpotCategory.MUSHROOMS) }
+    var categories by rememberSaveable { mutableStateOf(setOf(SpotCategory.MUSHROOMS)) }
     var notes by rememberSaveable { mutableStateOf("") }
+    // Kept as the date picker's UTC millis: LocalDate cannot be saved in the instance state
+    var lastFoundMillis by rememberSaveable { mutableStateOf<Long?>(null) }
+    var previousFoundMillis by rememberSaveable { mutableStateOf<Long?>(null) }
     var source by rememberSaveable {
         mutableStateOf(if (initialLinkText != null) LocationSource.LINK else LocationSource.GPS)
     }
@@ -112,7 +135,7 @@ fun AddSpotScreen(
         LocationSource.GPS -> (locationState as? LocationState.Found)?.point
         LocationSource.LINK -> ((linkState as? LinkState.Done)?.result as? MapLinkResult.Found)?.point
     }
-    val canSave = name.isNotBlank() && location != null
+    val canSave = name.isNotBlank() && categories.isNotEmpty() && location != null
 
     Scaffold(
         topBar = {
@@ -153,15 +176,40 @@ fun AddSpotScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            Text("Cosa si trova", style = MaterialTheme.typography.titleSmall)
+            Column {
+                Text("Cosa si trova", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    if (categories.isEmpty()) "Scegli almeno una voce" else "Puoi sceglierne più di una",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (categories.isEmpty()) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+            }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SpotCategory.entries.forEach { option ->
                     FilterChip(
-                        selected = option == category,
-                        onClick = { category = option },
+                        selected = option in categories,
+                        onClick = { categories = if (option in categories) categories - option else categories + option },
                         label = { Text(option.label) },
                     )
                 }
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Ritrovamenti (facoltativo)", style = MaterialTheme.typography.titleSmall)
+                FindDateField(
+                    label = "Ultimo ritrovamento",
+                    utcMillis = lastFoundMillis,
+                    onChange = { lastFoundMillis = it },
+                )
+                FindDateField(
+                    label = "Penultimo ritrovamento",
+                    utcMillis = previousFoundMillis,
+                    onChange = { previousFoundMillis = it },
+                )
             }
 
             OutlinedTextField(
@@ -173,7 +221,12 @@ fun AddSpotScreen(
             )
 
             Button(
-                onClick = { location?.let { onSave(name, category, notes, it) } },
+                onClick = {
+                    location?.let {
+                        val findDates = listOfNotNull(lastFoundMillis, previousFoundMillis).map(::utcMillisToDate)
+                        onSave(name, categories, notes, findDates, it)
+                    }
+                },
                 enabled = canSave,
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -313,3 +366,53 @@ private fun FoundPoint(point: GeoPoint) {
         )
     }
 }
+
+/** A date the user can pick or leave empty; [utcMillis] is midnight UTC, as used by the date picker. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FindDateField(label: String, utcMillis: Long?, onChange: (Long?) -> Unit) {
+    var picking by remember { mutableStateOf(false) }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        OutlinedButton(onClick = { picking = true }, modifier = Modifier.weight(1f)) {
+            Icon(Icons.Outlined.CalendarMonth, contentDescription = null, modifier = Modifier.size(18.dp))
+            Text(
+                "$label: ${utcMillis?.let { formatDate(utcMillisToDate(it)) } ?: "non indicato"}",
+                modifier = Modifier.padding(start = 8.dp).weight(1f),
+            )
+        }
+        if (utcMillis != null) {
+            IconButton(onClick = { onChange(null) }) {
+                Icon(Icons.Filled.Clear, contentDescription = "Togli data")
+            }
+        }
+    }
+    if (picking) {
+        val todayMillis = remember {
+            Clock.System.todayIn(TimeZone.currentSystemDefault()).atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds()
+        }
+        val state = rememberDatePickerState(
+            initialSelectedDateMillis = utcMillis,
+            selectableDates = object : SelectableDates {
+                // A find cannot be in the future
+                override fun isSelectableDate(utcTimeMillis: Long) = utcTimeMillis <= todayMillis
+            },
+        )
+        DatePickerDialog(
+            onDismissRequest = { picking = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    onChange(state.selectedDateMillis)
+                    picking = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { picking = false }) { Text("Annulla") }
+            },
+        ) {
+            DatePicker(state = state)
+        }
+    }
+}
+
+private fun utcMillisToDate(utcMillis: Long): LocalDate =
+    Instant.fromEpochMilliseconds(utcMillis).toLocalDateTime(TimeZone.UTC).date

@@ -7,7 +7,7 @@ enum class ExportFormat(val extension: String, val mimeType: String) {
     /** Fungast's own format: keeps every field, for backups and moving to another phone. */
     FUNGAST("fungast", "application/json"),
 
-    /** Standard waypoints, readable by other map/GPS apps; category and accuracy are partly lost. */
+    /** Standard waypoints, readable by other map/GPS apps; categories are kept as text, accuracy and find dates are lost. */
     GPX("gpx", "application/gpx+xml"),
 }
 

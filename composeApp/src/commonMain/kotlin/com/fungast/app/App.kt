@@ -97,8 +97,8 @@ fun App(
                     locationProvider = locationProvider,
                     linkResolver = linkResolver,
                     initialLinkText = initialLinkText,
-                    onSave = { name, category, notes, location ->
-                        viewModel.addSpot(name, category, notes, location)
+                    onSave = { name, categories, notes, findDates, location ->
+                        viewModel.addSpot(name, categories, notes, location, findDates)
                         screen = Screen.SpotList
                     },
                     onBack = { screen = Screen.SpotList },

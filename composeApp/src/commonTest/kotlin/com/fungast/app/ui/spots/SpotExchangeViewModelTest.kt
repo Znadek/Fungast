@@ -28,7 +28,7 @@ class SpotExchangeViewModelTest {
 
     private fun spot(name: String, latitude: Double = 46.0, longitude: Double = 11.0) = Spot(
         name = name,
-        category = SpotCategory.MUSHROOMS,
+        categories = setOf(SpotCategory.MUSHROOMS),
         latitude = latitude,
         longitude = longitude,
         altitude = null,

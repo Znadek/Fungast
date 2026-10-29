@@ -14,6 +14,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SpotsViewModelTest {
@@ -32,7 +33,7 @@ class SpotsViewModelTest {
 
         viewModel.addSpot(
             name = "  Faggeta  ",
-            category = SpotCategory.MUSHROOMS,
+            categories = setOf(SpotCategory.MUSHROOMS, SpotCategory.CHESTNUTS),
             notes = " porcini dopo la pioggia\n",
             location = GeoPoint(46.1, 11.2, altitude = 1200.0, accuracyMeters = 5f),
         )
@@ -40,18 +41,48 @@ class SpotsViewModelTest {
         val saved = dao.spots.value.single()
         assertEquals("Faggeta", saved.name)
         assertEquals("porcini dopo la pioggia", saved.notes)
-        assertEquals(SpotCategory.MUSHROOMS, saved.category)
+        assertEquals(setOf(SpotCategory.MUSHROOMS, SpotCategory.CHESTNUTS), saved.categories)
         assertEquals(46.1, saved.latitude)
         assertEquals(11.2, saved.longitude)
         assertEquals(1200.0, saved.altitude)
         assertEquals(5f, saved.accuracyMeters)
         assertEquals(now.toEpochMilliseconds(), saved.createdAt)
+        assertEquals(null, saved.lastFoundOn)
+        assertEquals(null, saved.previousFoundOn)
+    }
+
+    @Test
+    fun findDatesAreStoredMostRecentFirst() {
+        val viewModel = SpotsViewModel(dao, FixedClock(now))
+
+        viewModel.addSpot(
+            "Faggeta",
+            setOf(SpotCategory.MUSHROOMS),
+            "",
+            GeoPoint(46.1, 11.2),
+            findDates = listOf(LocalDate(2025, 9, 30), LocalDate(2026, 10, 20)),
+        )
+
+        val saved = dao.spots.value.single()
+        assertEquals(LocalDate(2026, 10, 20), saved.lastFoundOn)
+        assertEquals(LocalDate(2025, 9, 30), saved.previousFoundOn)
+    }
+
+    @Test
+    fun singleFindDateIsTheLastOne() {
+        val viewModel = SpotsViewModel(dao, FixedClock(now))
+
+        viewModel.addSpot("Faggeta", setOf(SpotCategory.MUSHROOMS), "", GeoPoint(46.1, 11.2), listOf(LocalDate(2026, 10, 20)))
+
+        val saved = dao.spots.value.single()
+        assertEquals(LocalDate(2026, 10, 20), saved.lastFoundOn)
+        assertEquals(null, saved.previousFoundOn)
     }
 
     @Test
     fun deleteSpotRemovesIt() {
         val viewModel = SpotsViewModel(dao, FixedClock(now))
-        viewModel.addSpot("Castagneto", SpotCategory.CHESTNUTS, "", GeoPoint(45.0, 9.0))
+        viewModel.addSpot("Castagneto", setOf(SpotCategory.CHESTNUTS), "", GeoPoint(45.0, 9.0))
 
         viewModel.deleteSpot(dao.spots.value.single())
 

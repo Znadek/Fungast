@@ -7,6 +7,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
 
 class SpotFilesTest {
     private val now = Instant.parse("2026-10-27T18:00:00Z")
@@ -14,18 +15,20 @@ class SpotFilesTest {
         Spot(
             id = 7,
             name = "Faggeta <alta> & \"bassa\"",
-            category = SpotCategory.MUSHROOMS,
+            categories = setOf(SpotCategory.MUSHROOMS, SpotCategory.BERRIES),
             latitude = 46.1234567,
             longitude = 11.0000001,
             altitude = 1203.4,
             accuracyMeters = 4.5f,
             notes = "Porcini dopo la pioggia\nsotto i faggi",
             createdAt = Instant.parse("2026-09-12T07:30:00Z").toEpochMilliseconds(),
+            lastFoundOn = LocalDate(2026, 10, 20),
+            previousFoundOn = LocalDate(2025, 9, 30),
         ),
         Spot(
             id = 8,
             name = "Castagneto",
-            category = SpotCategory.CHESTNUTS,
+            categories = setOf(SpotCategory.CHESTNUTS),
             latitude = -0.0001,
             longitude = -3.5,
             altitude = null,
@@ -43,12 +46,12 @@ class SpotFilesTest {
     }
 
     @Test
-    fun gpxRoundTripKeepsNameNotesCategoryPositionAndDate() {
+    fun gpxRoundTripKeepsNameNotesCategoriesPositionAndDate() {
         val text = encodeSpots(spots, ExportFormat.GPX, now)
         val decoded = decodeSpots(text, now)
 
         assertTrue("1.0E-4" !in text, "coordinates must not use scientific notation")
-        assertEquals(spots.map { it.copy(id = 0, accuracyMeters = null) }, decoded)
+        assertEquals(spots.map { it.copy(id = 0, accuracyMeters = null, lastFoundOn = null, previousFoundOn = null) }, decoded)
     }
 
     @Test
@@ -71,7 +74,7 @@ class SpotFilesTest {
             assertEquals("Mirtilli à volontà", notes)
             assertEquals(46.25, latitude)
             assertEquals(11.5, longitude)
-            assertEquals(SpotCategory.OTHER, category)
+            assertEquals(setOf(SpotCategory.OTHER), categories)
             assertEquals(now.toEpochMilliseconds(), createdAt)
         }
         assertEquals(DEFAULT_IMPORTED_NAME, decoded[1].name)
@@ -88,7 +91,28 @@ class SpotFilesTest {
     fun unknownCategoryInFungastFileBecomesOther() {
         val text = encodeSpots(spots.take(1), ExportFormat.FUNGAST, now).replace("MUSHROOMS", "TRUFFLES")
 
-        assertEquals(SpotCategory.OTHER, decodeSpots(text, now).single().category)
+        assertEquals(setOf(SpotCategory.OTHER, SpotCategory.BERRIES), decodeSpots(text, now).single().categories)
+    }
+
+    @Test
+    fun fungastFileFromSingleCategoryVersionIsRead() {
+        val text = """
+            {"format":"fungast","version":1,"spots":[
+              {"name":"Vecchio","category":"CHESTNUTS","latitude":46.0,"longitude":11.0,"createdAt":"2026-09-12T07:30:00Z"}
+            ]}
+        """.trimIndent()
+
+        with(decodeSpots(text, now).single()) {
+            assertEquals(setOf(SpotCategory.CHESTNUTS), categories)
+            assertEquals(null, lastFoundOn)
+        }
+    }
+
+    @Test
+    fun fungastFileStillWritesSingleCategoryForOlderVersions() {
+        val text = encodeSpots(spots.take(1), ExportFormat.FUNGAST, now)
+
+        assertTrue("\"category\": \"MUSHROOMS\"" in text)
     }
 
     @Test
