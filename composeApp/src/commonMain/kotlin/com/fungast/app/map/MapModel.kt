@@ -1,6 +1,7 @@
 package com.fungast.app.map
 
 import com.fungast.app.data.SpotCategory
+import com.fungast.app.location.GeoPoint
 
 /** OpenStreetMap-based vector style from OpenFreeMap: free, no API key, tiles can be stored offline. */
 const val MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty"
@@ -26,3 +27,6 @@ val SpotCategory.markerColorHex: String
         SpotCategory.ASPARAGUS -> "#3E8E41"
         SpotCategory.OTHER -> "#1F6FB2"
     }
+
+/** A route as a line on the map; [recording] is drawn differently from the finished ones. */
+data class RouteTrack(val routeId: Long, val points: List<GeoPoint>, val recording: Boolean)

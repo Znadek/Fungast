@@ -33,17 +33,24 @@ import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.layers.CircleLayer
+import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
 import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
+import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
 
 private const val SPOTS_SOURCE = "spots"
 private const val SPOTS_CIRCLE_LAYER = "spots-circles"
 private const val SPOTS_LABEL_LAYER = "spots-labels"
+private const val ROUTES_SOURCE = "routes"
+private const val ROUTES_LAYER = "routes-lines"
+private const val ROUTE_COLOR = "#E67E22"
+private const val FOCUSED_ROUTE_COLOR = "#6C3483"
+private const val RECORDING_ROUTE_COLOR = "#C0392B"
 
 // Roughly central Italy, used until there are spots to frame
 private val DEFAULT_CAMERA = CameraPosition.Builder().target(LatLng(42.5, 12.5)).zoom(5.0).build()
@@ -54,6 +61,8 @@ private const val TAP_TOLERANCE_PX = 24f
 @Composable
 actual fun SpotsMap(
     spots: List<Spot>,
+    routes: List<RouteTrack>,
+    focusedRouteId: Long?,
     onSpotClick: (Spot) -> Unit,
     onViewportChange: (MapViewport) -> Unit,
     modifier: Modifier,
@@ -121,6 +130,8 @@ actual fun SpotsMap(
                 )
             }
             mapLibreMap.setStyle(Style.Builder().fromUri(MAP_STYLE_URL)) { loadedStyle ->
+                // Added first, so lines are drawn under the spot markers
+                loadedStyle.addRouteLayer()
                 loadedStyle.addSpotLayers()
                 mapLibreMap.showUserLocation(context, loadedStyle)
                 style = loadedStyle
@@ -132,10 +143,25 @@ actual fun SpotsMap(
     LaunchedEffect(style, spots) {
         val loadedStyle = style ?: return@LaunchedEffect
         loadedStyle.getSourceAs<GeoJsonSource>(SPOTS_SOURCE)?.setGeoJson(spots.toFeatureCollection())
-        if (!cameraFitted && spots.isNotEmpty()) {
-            map?.frame(spots)
+        // A route to show takes over the first framing
+        if (!cameraFitted && spots.isNotEmpty() && focusedRouteId == null) {
+            map?.frame(spots.map { LatLng(it.latitude, it.longitude) })
             cameraFitted = true
         }
+    }
+
+    LaunchedEffect(style, routes, focusedRouteId) {
+        val loadedStyle = style ?: return@LaunchedEffect
+        loadedStyle.getSourceAs<GeoJsonSource>(ROUTES_SOURCE)?.setGeoJson(routes.toFeatureCollection(focusedRouteId))
+    }
+
+    // Only when the focus changes, so following a recording route doesn't keep moving the camera
+    LaunchedEffect(style, focusedRouteId) {
+        style ?: return@LaunchedEffect
+        val points = routes.find { it.routeId == focusedRouteId }?.points ?: return@LaunchedEffect
+        if (points.isEmpty()) return@LaunchedEffect
+        map?.frame(points.map { LatLng(it.latitude, it.longitude) })
+        cameraFitted = true
     }
 
     AndroidView(factory = { mapView }, modifier = modifier)
@@ -166,6 +192,35 @@ private fun Style.addSpotLayers() {
     )
 }
 
+private fun Style.addRouteLayer() {
+    addSource(GeoJsonSource(ROUTES_SOURCE))
+    addLayer(
+        LineLayer(ROUTES_LAYER, ROUTES_SOURCE).withProperties(
+            PropertyFactory.lineColor(Expression.toColor(Expression.get("color"))),
+            PropertyFactory.lineWidth(Expression.get("width")),
+            PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+            PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
+        )
+    )
+}
+
+private fun List<RouteTrack>.toFeatureCollection(focusedRouteId: Long?): FeatureCollection =
+    FeatureCollection.fromFeatures(
+        // A line needs two points; the focused one last, so it is drawn on top
+        filter { it.points.size >= 2 }.sortedBy { it.routeId == focusedRouteId }.map { track ->
+            val line = LineString.fromLngLats(track.points.map { Point.fromLngLat(it.longitude, it.latitude) })
+            Feature.fromGeometry(line).apply {
+                val (color, width) = when {
+                    track.recording -> RECORDING_ROUTE_COLOR to 5f
+                    track.routeId == focusedRouteId -> FOCUSED_ROUTE_COLOR to 6f
+                    else -> ROUTE_COLOR to 3.5f
+                }
+                addStringProperty("color", color)
+                addNumberProperty("width", width)
+            }
+        }
+    )
+
 private fun List<Spot>.toFeatureCollection(): FeatureCollection =
     FeatureCollection.fromFeatures(
         map { spot ->
@@ -177,8 +232,7 @@ private fun List<Spot>.toFeatureCollection(): FeatureCollection =
         }
     )
 
-private fun MapLibreMap.frame(spots: List<Spot>) {
-    val points = spots.map { LatLng(it.latitude, it.longitude) }
+private fun MapLibreMap.frame(points: List<LatLng>) {
     val update = if (points.distinct().size == 1) {
         CameraUpdateFactory.newLatLngZoom(points.first(), SINGLE_SPOT_ZOOM)
     } else {

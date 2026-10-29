@@ -43,6 +43,13 @@ class FormatTest {
     }
 
     @Test
+    fun durationUsesMinutesThenHours() {
+        assertEquals("0 min", formatDuration(59_000))
+        assertEquals("45 min", formatDuration(45 * 60_000L))
+        assertEquals("2 h 05 min", formatDuration(125 * 60_000L))
+    }
+
+    @Test
     fun distanceUsesMetersThenKilometers() {
         assertEquals("0 m", formatDistance(0.2))
         assertEquals("850 m", formatDistance(849.6))

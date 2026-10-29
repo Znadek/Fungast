@@ -14,6 +14,8 @@ import com.fungast.app.data.Spot
 @Composable
 actual fun SpotsMap(
     spots: List<Spot>,
+    routes: List<RouteTrack>,
+    focusedRouteId: Long?,
     onSpotClick: (Spot) -> Unit,
     onViewportChange: (MapViewport) -> Unit,
     modifier: Modifier,

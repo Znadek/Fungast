@@ -1,6 +1,7 @@
 package com.fungast.app.location
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
@@ -59,42 +60,11 @@ class AndroidLocationProvider(private val activity: ComponentActivity) : Locatio
         return null
     }
 
-    @Suppress("MissingPermission") // Checked before registering
-    override fun locationUpdates(): Flow<GeoPoint> = callbackFlow {
-        val locationManager = activity.getSystemService(LocationManager::class.java)
-        val provider = locationManager?.let { enabledProviders(it).firstOrNull() }
-        if (provider == null || !hasAnyLocationPermission()) {
-            close()
-            return@callbackFlow
-        }
-        val listener = LocationListenerCompat { location -> trySend(location.toGeoPoint()) }
-        LocationManagerCompat.requestLocationUpdates(
-            locationManager,
-            provider,
-            LocationRequestCompat.Builder(UPDATE_INTERVAL_MS)
-                .setQuality(LocationRequestCompat.QUALITY_HIGH_ACCURACY)
-                .build(),
-            ContextCompat.getMainExecutor(activity),
-            listener,
-        )
-        awaitClose { LocationManagerCompat.removeUpdates(locationManager, listener) }
-    }
+    override fun locationUpdates(): Flow<GeoPoint> = activity.locationUpdates(UPDATE_INTERVAL_MS)
 
-    /**
-     * Enabled providers, best first. GPS alone can't get a fix indoors, so the network provider is the fallback.
-     * Fused (Android 12+) combines GPS, Wi-Fi and cell, and is fast both indoors and in the woods.
-     */
-    private fun enabledProviders(locationManager: LocationManager): List<String> = buildList {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-            locationManager.hasProvider(LocationManager.FUSED_PROVIDER)
-        ) add(LocationManager.FUSED_PROVIDER)
-        if (hasPermission(Manifest.permission.ACCESS_FINE_LOCATION)) add(LocationManager.GPS_PROVIDER)
-        add(LocationManager.NETWORK_PROVIDER)
-    }.filter { locationManager.isProviderEnabled(it) }
+    private fun enabledProviders(locationManager: LocationManager) = activity.enabledProviders(locationManager)
 
-    private fun hasAnyLocationPermission() =
-        hasPermission(Manifest.permission.ACCESS_FINE_LOCATION) ||
-            hasPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
+    private fun hasAnyLocationPermission() = activity.hasAnyLocationPermission()
 
     @Suppress("MissingPermission") // Checked in currentLocation()
     private suspend fun requestSingleFix(locationManager: LocationManager, provider: String): Location? =
@@ -109,18 +79,59 @@ class AndroidLocationProvider(private val activity: ComponentActivity) : Locatio
             ) { location -> continuation.resume(location) }
         }
 
-    private fun hasPermission(permission: String) =
-        ContextCompat.checkSelfPermission(activity, permission) == PackageManager.PERMISSION_GRANTED
-
-    private fun Location.toGeoPoint() = GeoPoint(
-        latitude = latitude,
-        longitude = longitude,
-        altitude = if (hasAltitude()) altitude else null,
-        accuracyMeters = if (hasAccuracy()) accuracy else null,
-    )
-
     private companion object {
         const val LOCATION_TIMEOUT_MS = 60_000L
         const val UPDATE_INTERVAL_MS = 1_000L
     }
 }
+
+/**
+ * Emits position fixes about every [intervalMs] while collected; stops the GPS when collection stops.
+ * Takes any [Context], so a service can use it with the screen off. Completes at once without permission.
+ */
+@Suppress("MissingPermission") // Checked before registering
+fun Context.locationUpdates(intervalMs: Long): Flow<GeoPoint> = callbackFlow {
+    val locationManager = getSystemService(LocationManager::class.java)
+    val provider = locationManager?.let { enabledProviders(it).firstOrNull() }
+    if (provider == null || !hasAnyLocationPermission()) {
+        close()
+        return@callbackFlow
+    }
+    val listener = LocationListenerCompat { location -> trySend(location.toGeoPoint()) }
+    LocationManagerCompat.requestLocationUpdates(
+        locationManager,
+        provider,
+        LocationRequestCompat.Builder(intervalMs)
+            .setQuality(LocationRequestCompat.QUALITY_HIGH_ACCURACY)
+            .build(),
+        ContextCompat.getMainExecutor(this@locationUpdates),
+        listener,
+    )
+    awaitClose { LocationManagerCompat.removeUpdates(locationManager, listener) }
+}
+
+/**
+ * Enabled providers, best first. GPS alone can't get a fix indoors, so the network provider is the fallback.
+ * Fused (Android 12+) combines GPS, Wi-Fi and cell, and is fast both indoors and in the woods.
+ */
+private fun Context.enabledProviders(locationManager: LocationManager): List<String> = buildList {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+        locationManager.hasProvider(LocationManager.FUSED_PROVIDER)
+    ) add(LocationManager.FUSED_PROVIDER)
+    if (hasPermission(Manifest.permission.ACCESS_FINE_LOCATION)) add(LocationManager.GPS_PROVIDER)
+    add(LocationManager.NETWORK_PROVIDER)
+}.filter { locationManager.isProviderEnabled(it) }
+
+fun Context.hasAnyLocationPermission() =
+    hasPermission(Manifest.permission.ACCESS_FINE_LOCATION) ||
+        hasPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
+
+private fun Context.hasPermission(permission: String) =
+    ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
+
+private fun Location.toGeoPoint() = GeoPoint(
+    latitude = latitude,
+    longitude = longitude,
+    altitude = if (hasAltitude()) altitude else null,
+    accuracyMeters = if (hasAccuracy()) accuracy else null,
+)

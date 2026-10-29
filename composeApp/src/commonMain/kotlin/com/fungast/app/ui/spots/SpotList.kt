@@ -43,6 +43,7 @@ fun SpotList(
     onGoToSpot: (Spot) -> Unit,
     onDeleteSpot: (Spot) -> Unit,
     photoActions: (Spot) -> PhotoActions,
+    onShowGuide: () -> Unit,
 ) {
     var spotToDelete by remember { mutableStateOf<Spot?>(null) }
 
@@ -51,11 +52,16 @@ fun SpotList(
             modifier = Modifier.fillMaxSize().padding(contentPadding).padding(32.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = "Nessun posto salvato.\nQuando sei sul posto, tocca \"Salva posto\".",
-                textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.bodyLarge,
-            )
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "Nessun posto salvato.\nQuando sei sul posto, tocca \"Salva posto\".",
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                TextButton(onClick = onShowGuide, modifier = Modifier.padding(top = 8.dp)) {
+                    Text("Come funziona Fungast?")
+                }
+            }
         }
     } else {
         LazyColumn(

@@ -13,18 +13,21 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 
 @Database(
-    entities = [Spot::class],
-    version = 3,
+    entities = [Spot::class, Route::class, RoutePoint::class],
+    version = 4,
     autoMigrations = [
         AutoMigration(from = 1, to = 2, spec = MultipleCategoriesMigration::class),
         // Version 3: photos
         AutoMigration(from = 2, to = 3),
+        // Version 4: recorded routes
+        AutoMigration(from = 3, to = 4),
     ],
 )
 @TypeConverters(Converters::class)
 @ConstructedBy(FungastDatabaseConstructor::class)
 abstract class FungastDatabase : RoomDatabase() {
     abstract fun spotDao(): SpotDao
+    abstract fun routeDao(): RouteDao
 }
 
 /** Version 2: several categories per spot and optional find dates. A version 1 category name is a valid one-item list. */

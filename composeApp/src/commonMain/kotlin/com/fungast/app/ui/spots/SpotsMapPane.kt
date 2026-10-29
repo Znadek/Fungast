@@ -26,9 +26,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.fungast.app.data.Route
 import com.fungast.app.data.Spot
 import com.fungast.app.map.MapViewport
+import com.fungast.app.map.RouteTrack
 import com.fungast.app.map.SpotsMap
+import com.fungast.app.ui.formatDistance
+import com.fungast.app.ui.formatDuration
 import kotlin.math.roundToInt
 
 @Composable
@@ -38,6 +42,10 @@ fun SpotsMapPane(
     onDownloadArea: (MapViewport?) -> Unit,
     onGoToSpot: (Spot) -> Unit,
     photoActions: (Spot) -> PhotoActions,
+    routes: List<RouteTrack>,
+    /** Route chosen in the routes list: highlighted and framed. */
+    focusedRoute: Route?,
+    onClearRouteFocus: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var viewport by remember { mutableStateOf<MapViewport?>(null) }
@@ -47,6 +55,8 @@ fun SpotsMapPane(
     Box(modifier = modifier.fillMaxSize()) {
         SpotsMap(
             spots = spots,
+            routes = routes,
+            focusedRouteId = focusedRoute?.id,
             onSpotClick = { selectedSpotId = it.id },
             onViewportChange = { viewport = it },
             modifier = Modifier.fillMaxSize(),
@@ -56,6 +66,28 @@ fun SpotsMapPane(
             modifier = Modifier.fillMaxWidth().padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            focusedRoute?.let { route ->
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 4.dp, end = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(route.name, style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                listOfNotNull(
+                                    formatDistance(route.distanceMeters),
+                                    route.endedAt?.let { formatDuration(it - route.startedAt) },
+                                ).joinToString(" · "),
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                        IconButton(onClick = onClearRouteFocus) {
+                            Icon(Icons.Filled.Close, contentDescription = "Chiudi percorso")
+                        }
+                    }
+                }
+            }
             selectedSpot?.let { spot ->
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp)) {
