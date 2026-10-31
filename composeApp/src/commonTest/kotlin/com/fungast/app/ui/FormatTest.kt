@@ -2,6 +2,7 @@ package com.fungast.app.ui
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
@@ -34,6 +35,18 @@ class FormatTest {
     fun dateTimeIsPadded() {
         val millis = LocalDateTime(2026, 3, 7, 8, 5).toInstant(TimeZone.UTC).toEpochMilliseconds()
         assertEquals("07/03/2026 08:05", formatDateTime(millis, TimeZone.UTC))
+    }
+
+    @Test
+    fun dateIsPadded() {
+        assertEquals("07/03/2026", formatDate(LocalDate(2026, 3, 7)))
+    }
+
+    @Test
+    fun durationUsesMinutesThenHours() {
+        assertEquals("0 min", formatDuration(59_000))
+        assertEquals("45 min", formatDuration(45 * 60_000L))
+        assertEquals("2 h 05 min", formatDuration(125 * 60_000L))
     }
 
     @Test

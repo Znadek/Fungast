@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+. Cloud backup is capped at 25 MB per app and stops entirely above it, spots included:
+     offline map tiles can be downloaded again, so they stay out. Spots and photos are kept.
+     Device-to-device transfer has no cap and keeps everything (no <device-transfer> rules). -->
 <data-extraction-rules>
-    <cloud-backup />
+    <cloud-backup>
+        <exclude domain="file" path="mbgl-offline.db" />
+        <exclude domain="file" path="mbgl-offline.db-journal" />
+    </cloud-backup>
 </data-extraction-rules>

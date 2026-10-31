@@ -3,6 +3,7 @@ package com.fungast.app.ui
 import kotlin.math.abs
 import kotlin.math.roundToLong
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
@@ -38,4 +39,14 @@ fun formatDateTime(epochMillis: Long, timeZone: TimeZone = TimeZone.currentSyste
     val dt = Instant.fromEpochMilliseconds(epochMillis).toLocalDateTime(timeZone)
     fun Int.pad() = toString().padStart(2, '0')
     return "${dt.dayOfMonth.pad()}/${dt.monthNumber.pad()}/${dt.year} ${dt.hour.pad()}:${dt.minute.pad()}"
+}
+
+/** Formats a date as dd/MM/yyyy. */
+fun formatDate(date: LocalDate): String =
+    "${date.dayOfMonth.toString().padStart(2, '0')}/${date.monthNumber.toString().padStart(2, '0')}/${date.year}"
+
+/** Formats a duration as "45 min" or "2 h 05 min", rounded down to the minute. */
+fun formatDuration(millis: Long): String {
+    val minutes = (millis / 60_000).coerceAtLeast(0)
+    return if (minutes < 60) "$minutes min" else "${minutes / 60} h ${(minutes % 60).toString().padStart(2, '0')} min"
 }

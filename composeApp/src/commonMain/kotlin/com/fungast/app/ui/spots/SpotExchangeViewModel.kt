@@ -4,11 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fungast.app.data.Spot
 import com.fungast.app.data.SpotDao
+import com.fungast.app.exchange.DecodedSpot
 import com.fungast.app.exchange.ExportFormat
 import com.fungast.app.exchange.SharedFile
 import com.fungast.app.exchange.SpotFileException
-import com.fungast.app.exchange.decodeSpots
+import com.fungast.app.exchange.decodeSpotsWithPhotos
 import com.fungast.app.exchange.encodeSpots
+import com.fungast.app.photos.PhotoStore
 import kotlin.math.roundToLong
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -33,14 +35,18 @@ sealed interface ExchangeMessage {
  */
 class SpotExchangeViewModel(
     private val spotDao: SpotDao,
+    private val photoStore: PhotoStore,
     private val clock: Clock = Clock.System,
 ) : ViewModel() {
 
     private val _message = MutableStateFlow<ExchangeMessage?>(null)
     val message: StateFlow<ExchangeMessage?> = _message.asStateFlow()
 
-    /** Returns the file to share, or null (with a message) if there is nothing to export. */
-    suspend fun buildExport(format: ExportFormat): SharedFile? {
+    /**
+     * Returns the file to share, or null (with a message) if there is nothing to export.
+     * [includePhotos] embeds the photos in a .fungast backup, making it much larger.
+     */
+    suspend fun buildExport(format: ExportFormat, includePhotos: Boolean = false): SharedFile? {
         val spots = spotDao.getAll()
         if (spots.isEmpty()) {
             _message.value = ExchangeMessage.NothingToExport
@@ -48,10 +54,15 @@ class SpotExchangeViewModel(
         }
         val now = clock.now()
         val date = now.toLocalDateTime(TimeZone.currentSystemDefault()).date
+        val photos = if (includePhotos && format == ExportFormat.FUNGAST) {
+            spots.flatMap { it.photos }.mapNotNull { name -> photoStore.read(name)?.let { name to it } }.toMap()
+        } else {
+            emptyMap()
+        }
         return SharedFile(
-            name = "fungast-$date.${format.extension}",
+            name = "fungast-$date${if (photos.isNotEmpty()) "-con-foto" else ""}.${format.extension}",
             mimeType = format.mimeType,
-            content = encodeSpots(spots, format, exportedAt = now),
+            content = encodeSpots(spots, format, exportedAt = now, photos = photos),
         )
     }
 
@@ -70,11 +81,12 @@ class SpotExchangeViewModel(
     /** Adds the spot in a code made by [com.fungast.app.exchange.encodeSpotQr]. */
     fun importQr(qrText: String) {
         viewModelScope.launch {
-            val spot = decodeOrNull(qrText)?.singleOrNull() ?: run {
+            val decoded = decodeOrNull(qrText)?.singleOrNull() ?: run {
                 _message.value = ExchangeMessage.QrInvalid
                 return@launch
             }
-            _message.value = if (addNew(listOf(spot)) == 1) {
+            val spot = decoded.spot
+            _message.value = if (addNew(listOf(decoded)) == 1) {
                 ExchangeMessage.QrImported(spot.name)
             } else {
                 ExchangeMessage.QrAlreadySaved(spot.name)
@@ -82,17 +94,18 @@ class SpotExchangeViewModel(
         }
     }
 
-    private fun decodeOrNull(text: String): List<Spot>? = try {
-        decodeSpots(text, now = clock.now())
+    private fun decodeOrNull(text: String): List<DecodedSpot>? = try {
+        decodeSpotsWithPhotos(text, now = clock.now())
     } catch (e: SpotFileException) {
         null
     }
 
     /** Inserts the spots not saved yet and returns how many they were. */
-    private suspend fun addNew(spots: List<Spot>): Int {
+    private suspend fun addNew(spots: List<DecodedSpot>): Int {
         val knownKeys = spotDao.getAll().mapTo(mutableSetOf()) { it.duplicateKey() }
         // add() also drops duplicates inside the list itself
-        val newSpots = spots.filter { knownKeys.add(it.duplicateKey()) }
+        val newSpots = spots.filter { knownKeys.add(it.spot.duplicateKey()) }
+            .map { decoded -> decoded.spot.copy(photos = decoded.photos.mapNotNull { photoStore.save(it) }) }
         if (newSpots.isNotEmpty()) spotDao.insertAll(newSpots)
         return newSpots.size
     }

@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -30,6 +31,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.fungast.app.data.Spot
+import com.fungast.app.data.findDates
+import com.fungast.app.data.sortedCategories
+import com.fungast.app.ui.formatDate
 import com.fungast.app.ui.formatDateTime
 import com.fungast.app.ui.formatLatLon
 
@@ -38,7 +42,10 @@ fun SpotList(
     spots: List<Spot>,
     contentPadding: PaddingValues,
     onGoToSpot: (Spot) -> Unit,
+    onEditSpot: (Spot) -> Unit,
     onDeleteSpot: (Spot) -> Unit,
+    photoActions: (Spot) -> PhotoActions,
+    onShowGuide: () -> Unit,
 ) {
     var spotToDelete by remember { mutableStateOf<Spot?>(null) }
 
@@ -47,11 +54,16 @@ fun SpotList(
             modifier = Modifier.fillMaxSize().padding(contentPadding).padding(32.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = "Nessun posto salvato.\nQuando sei sul posto, tocca \"Salva posto\".",
-                textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.bodyLarge,
-            )
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "Nessun posto salvato.\nQuando sei sul posto, tocca \"Salva posto\".",
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                TextButton(onClick = onShowGuide, modifier = Modifier.padding(top = 8.dp)) {
+                    Text("Come funziona Fungast?")
+                }
+            }
         }
     } else {
         LazyColumn(
@@ -66,7 +78,13 @@ fun SpotList(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             items(spots, key = { it.id }) { spot ->
-                SpotItem(spot = spot, onGoTo = { onGoToSpot(spot) }, onDelete = { spotToDelete = spot })
+                SpotItem(
+                    spot = spot,
+                    photoActions = photoActions(spot),
+                    onGoTo = { onGoToSpot(spot) },
+                    onEdit = { onEditSpot(spot) },
+                    onDelete = { spotToDelete = spot },
+                )
             }
         }
     }
@@ -75,7 +93,15 @@ fun SpotList(
         AlertDialog(
             onDismissRequest = { spotToDelete = null },
             title = { Text("Eliminare \"${spot.name}\"?") },
-            text = { Text("Il posto verrà cancellato definitivamente.") },
+            text = {
+                Text(
+                    if (spot.photos.isEmpty()) {
+                        "Il posto verrà cancellato definitivamente."
+                    } else {
+                        "Il posto e le sue foto verranno cancellati definitivamente."
+                    },
+                )
+            },
             confirmButton = {
                 TextButton(onClick = {
                     onDeleteSpot(spot)
@@ -90,18 +116,30 @@ fun SpotList(
 }
 
 @Composable
-private fun SpotItem(spot: Spot, onGoTo: () -> Unit, onDelete: () -> Unit) {
+private fun SpotItem(
+    spot: Spot,
+    photoActions: PhotoActions,
+    onGoTo: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            SpotSummary(spot, modifier = Modifier.weight(1f))
-            ShowSpotQrButton(spot)
-            GoToSpotButton(onClick = onGoTo)
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Outlined.Delete, contentDescription = "Elimina")
+        Column(modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SpotSummary(spot, modifier = Modifier.weight(1f))
+                ShowSpotQrButton(spot)
+                GoToSpotButton(onClick = onGoTo)
+                EditSpotButton(onClick = onEdit)
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Outlined.Delete, contentDescription = "Elimina")
+                }
             }
+            SpotPhotos(
+                photos = spot.photos,
+                actions = photoActions,
+                thumbnailSize = 56.dp,
+                modifier = Modifier.padding(top = 8.dp, end = 12.dp),
+            )
         }
     }
 }
@@ -114,16 +152,39 @@ fun GoToSpotButton(onClick: () -> Unit) {
     }
 }
 
-/** Name, category, date, coordinates and notes of a spot; shared by the list and the map. */
+/** Opens the form to change a saved spot. */
+@Composable
+fun EditSpotButton(onClick: () -> Unit) {
+    IconButton(onClick = onClick) {
+        Icon(Icons.Outlined.Edit, contentDescription = "Modifica")
+    }
+}
+
+/** Name, categories, dates, coordinates and notes of a spot; shared by the list and the map. */
 @Composable
 fun SpotSummary(spot: Spot, modifier: Modifier = Modifier) {
     Column(modifier = modifier) {
         Text(spot.name, style = MaterialTheme.typography.titleMedium)
         Text(
-            "${spot.category.label} · ${formatDateTime(spot.createdAt)}",
+            "${spot.sortedCategories.joinToString(", ") { it.label }} · ${formatDateTime(spot.createdAt)}",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        spot.quantity?.let {
+            Text(
+                "Quantità: ${it.label.lowercase()}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (spot.findDates.isNotEmpty()) {
+            Text(
+                (if (spot.findDates.size == 1) "Ultimo ritrovamento: " else "Ultimi ritrovamenti: ") +
+                    spot.findDates.joinToString(", ") { formatDate(it) },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         Text(
             formatLatLon(spot.latitude, spot.longitude),
             style = MaterialTheme.typography.bodySmall,

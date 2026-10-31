@@ -2,6 +2,8 @@ package com.fungast.app.exchange
 
 import com.fungast.app.data.Spot
 import com.fungast.app.data.SpotCategory
+import com.fungast.app.data.SpotQuantity
+import com.fungast.app.data.sortedCategories
 import kotlin.math.abs
 import kotlin.math.roundToLong
 import kotlinx.datetime.Instant
@@ -18,8 +20,11 @@ internal fun encodeGpx(spots: List<Spot>, exportedAt: Instant): String = buildSt
         spot.altitude?.let { appendLine("    <ele>${formatDecimal(it, 1)}</ele>") }
         appendLine("    <time>${Instant.fromEpochMilliseconds(spot.createdAt)}</time>")
         appendLine("    <name>${escapeXml(spot.name)}</name>")
-        if (spot.notes.isNotEmpty()) appendLine("    <desc>${escapeXml(spot.notes)}</desc>")
-        appendLine("    <type>${escapeXml(spot.category.label)}</type>")
+        // Other apps have no quantity field: it goes on the last line of the description, where they show it
+        val description = listOfNotNull(spot.notes.ifEmpty { null }, spot.quantity?.let(::quantityLine))
+            .joinToString("\n")
+        if (description.isNotEmpty()) appendLine("    <desc>${escapeXml(description)}</desc>")
+        appendLine("    <type>${escapeXml(spot.sortedCategories.joinToString(", ") { it.label })}</type>")
         appendLine("  </wpt>")
     }
     appendLine("</gpx>")
@@ -27,7 +32,7 @@ internal fun encodeGpx(spots: List<Spot>, exportedAt: Instant): String = buildSt
 
 private val WAYPOINT = Regex("""<wpt\b([^>]*?)(?:/>|>([\s\S]*?)</wpt>)""")
 
-internal fun decodeGpx(text: String, now: Instant): List<Spot> {
+internal fun decodeGpx(text: String, now: Instant): List<DecodedSpot> {
     if (!text.contains("<gpx")) throw SpotFileException("Non è un file GPX")
     return WAYPOINT.findAll(text).mapNotNull { match ->
         val attributes = match.groupValues[1]
@@ -35,19 +40,39 @@ internal fun decodeGpx(text: String, now: Instant): List<Spot> {
         val latitude = attribute(attributes, "lat")?.toDoubleOrNull() ?: return@mapNotNull null
         val longitude = attribute(attributes, "lon")?.toDoubleOrNull() ?: return@mapNotNull null
         val type = child(body, "type")
-        Spot(
+        val (notes, quantity) = splitQuantity(child(body, "desc") ?: child(body, "cmt") ?: "")
+        val spot = Spot(
             name = child(body, "name")?.ifEmpty { null } ?: DEFAULT_IMPORTED_NAME,
-            category = SpotCategory.entries.find { type.equals(it.label, ignoreCase = true) || type == it.name }
-                ?: SpotCategory.OTHER,
+            categories = type.orEmpty().split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                .map { part ->
+                    SpotCategory.entries.find { part.equals(it.label, ignoreCase = true) || part == it.name }
+                        ?: SpotCategory.OTHER
+                }
+                .toSet()
+                .ifEmpty { setOf(SpotCategory.OTHER) },
             latitude = latitude,
             longitude = longitude,
             altitude = child(body, "ele")?.toDoubleOrNull(),
             accuracyMeters = null,
-            notes = child(body, "desc") ?: child(body, "cmt") ?: "",
+            notes = notes,
             createdAt = (child(body, "time")?.let { runCatching { Instant.parse(it) }.getOrNull() } ?: now)
                 .toEpochMilliseconds(),
+            quantity = quantity,
         )
+        DecodedSpot(spot)
     }.toList()
+}
+
+private const val QUANTITY_PREFIX = "Quantità: "
+
+private fun quantityLine(quantity: SpotQuantity) = QUANTITY_PREFIX + quantity.label.lowercase()
+
+/** Separates the quantity line written by [encodeGpx] from the user's notes. */
+private fun splitQuantity(description: String): Pair<String, SpotQuantity?> {
+    val lastLine = description.substringAfterLast("\n")
+    val quantity = SpotQuantity.entries.find { quantityLine(it).equals(lastLine.trim(), ignoreCase = true) }
+        ?: return description to null
+    return description.substringBeforeLast("\n", missingDelimiterValue = "").trim() to quantity
 }
 
 private fun attribute(attributes: String, name: String): String? =

@@ -7,19 +7,22 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
 
 class SpotQrTest {
     private val now = Instant.parse("2026-10-27T18:00:00Z")
     private val spot = Spot(
         id = 7,
         name = "Faggeta \"alta\"",
-        category = SpotCategory.MUSHROOMS,
+        categories = setOf(SpotCategory.MUSHROOMS, SpotCategory.CHESTNUTS),
         latitude = 46.1234567,
         longitude = 11.0000001,
         altitude = 1203.4,
         accuracyMeters = 4.5f,
         notes = "Porcini dopo la pioggia\nsotto i faggi",
         createdAt = Instant.parse("2026-09-12T07:30:00Z").toEpochMilliseconds(),
+        lastFoundOn = LocalDate(2026, 10, 20),
+        previousFoundOn = LocalDate(2025, 9, 30),
     )
 
     @Test

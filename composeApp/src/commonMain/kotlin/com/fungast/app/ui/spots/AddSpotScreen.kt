@@ -15,10 +15,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -29,9 +32,12 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -44,16 +50,28 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.unit.dp
+import com.fungast.app.data.Spot
 import com.fungast.app.data.SpotCategory
+import com.fungast.app.data.SpotQuantity
 import com.fungast.app.location.GeoPoint
 import com.fungast.app.location.LinkResolver
 import com.fungast.app.location.LocationProvider
 import com.fungast.app.location.MapLinkResult
 import com.fungast.app.location.locationFromMapLink
+import com.fungast.app.photos.PhotoPicker
+import com.fungast.app.ui.PlatformBackHandler
+import com.fungast.app.ui.formatDate
 import com.fungast.app.ui.formatLatLon
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.toLocalDateTime
+import kotlinx.datetime.todayIn
 
 sealed interface LocationState {
     data object Searching : LocationState
@@ -69,14 +87,41 @@ fun AddSpotScreen(
     linkResolver: LinkResolver,
     /** When set, the screen starts in link mode with this text (shared from another app). */
     initialLinkText: String?,
-    onSave: (name: String, category: SpotCategory, notes: String, location: GeoPoint) -> Unit,
+    photoPicker: PhotoPicker,
+    /** The saved spot being edited, or null for a new spot. */
+    spot: Spot? = null,
+    onSave: (
+        name: String,
+        categories: Set<SpotCategory>,
+        quantity: SpotQuantity?,
+        notes: String,
+        findDates: List<LocalDate>,
+        photos: List<String>,
+        location: GeoPoint,
+    ) -> Unit,
+    /** Photos are stored as soon as they are taken: these were removed or left unsaved and can be deleted. */
+    onDiscardPhotos: (List<String>) -> Unit,
     onBack: () -> Unit,
 ) {
-    var name by rememberSaveable { mutableStateOf("") }
-    var category by rememberSaveable { mutableStateOf(SpotCategory.MUSHROOMS) }
-    var notes by rememberSaveable { mutableStateOf("") }
+    var name by rememberSaveable { mutableStateOf(spot?.name.orEmpty()) }
+    var categories by rememberSaveable { mutableStateOf(spot?.categories ?: setOf(SpotCategory.MUSHROOMS)) }
+    var quantity by rememberSaveable { mutableStateOf(spot?.quantity) }
+    var notes by rememberSaveable { mutableStateOf(spot?.notes.orEmpty()) }
+    // Kept as the date picker's UTC millis: LocalDate cannot be saved in the instance state
+    var lastFoundMillis by rememberSaveable { mutableStateOf(spot?.lastFoundOn?.let(::dateToUtcMillis)) }
+    var previousFoundMillis by rememberSaveable { mutableStateOf(spot?.previousFoundOn?.let(::dateToUtcMillis)) }
+    var photos by rememberSaveable { mutableStateOf(spot?.photos.orEmpty()) }
+    // Only photos added here can be deleted when leaving; the spot's own go only when the edit is saved
+    val savedPhotos = spot?.photos.orEmpty().toSet()
+    val sources = if (spot != null) LocationSource.entries else LocationSource.entries - LocationSource.SAVED
     var source by rememberSaveable {
-        mutableStateOf(if (initialLinkText != null) LocationSource.LINK else LocationSource.GPS)
+        mutableStateOf(
+            when {
+                spot != null -> LocationSource.SAVED
+                initialLinkText != null -> LocationSource.LINK
+                else -> LocationSource.GPS
+            }
+        )
     }
     var locationState by remember { mutableStateOf<LocationState>(LocationState.Searching) }
     var linkText by rememberSaveable { mutableStateOf(initialLinkText.orEmpty()) }
@@ -108,18 +153,33 @@ fun AddSpotScreen(
         linkState = LinkState.Done(locationFromMapLink(linkText, linkResolver))
     }
 
+    val savedPoint = spot?.let { GeoPoint(it.latitude, it.longitude, it.altitude, it.accuracyMeters) }
     val location = when (source) {
+        LocationSource.SAVED -> savedPoint
         LocationSource.GPS -> (locationState as? LocationState.Found)?.point
         LocationSource.LINK -> ((linkState as? LinkState.Done)?.result as? MapLinkResult.Found)?.point
     }
-    val canSave = name.isNotBlank() && location != null
+    val canSave = name.isNotBlank() && categories.isNotEmpty() && location != null
+    val leave = {
+        onDiscardPhotos(photos - savedPhotos)
+        onBack()
+    }
+    PlatformBackHandler(onBack = leave)
+    val photoActions = PhotoActions(
+        onTakePhoto = { scope.launch { photoPicker.takePhoto()?.let { photos = photos + it } } },
+        onPickPhotos = { scope.launch { photos = photos + photoPicker.pickPhotos() } },
+        onRemovePhoto = { photo ->
+            photos = photos - photo
+            if (photo !in savedPhotos) onDiscardPhotos(listOf(photo))
+        },
+    )
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Nuovo posto") },
+                title = { Text(if (spot != null) "Modifica posto" else "Nuovo posto") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = leave) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro")
                     }
                 },
@@ -135,8 +195,10 @@ fun AddSpotScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             LocationCard(
+                sources = sources,
                 source = source,
                 onSourceChange = { source = it },
+                savedPoint = savedPoint,
                 gpsState = locationState,
                 onRetry = { scope.launch { locate() } },
                 linkText = linkText,
@@ -153,15 +215,59 @@ fun AddSpotScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            Text("Cosa si trova", style = MaterialTheme.typography.titleSmall)
+            Column {
+                Text("Cosa si trova", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    if (categories.isEmpty()) "Scegli almeno una voce" else "Puoi sceglierne più di una",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (categories.isEmpty()) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+            }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SpotCategory.entries.forEach { option ->
                     FilterChip(
-                        selected = option == category,
-                        onClick = { category = option },
+                        selected = option in categories,
+                        onClick = { categories = if (option in categories) categories - option else categories + option },
                         label = { Text(option.label) },
                     )
                 }
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Quantità (facoltativo)", style = MaterialTheme.typography.titleSmall)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SpotQuantity.entries.forEach { option ->
+                        FilterChip(
+                            selected = option == quantity,
+                            // Tapping the chosen one again clears it
+                            onClick = { quantity = if (option == quantity) null else option },
+                            label = { Text(option.label) },
+                        )
+                    }
+                }
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Ritrovamenti (facoltativo)", style = MaterialTheme.typography.titleSmall)
+                FindDateField(
+                    label = "Ultimo ritrovamento",
+                    utcMillis = lastFoundMillis,
+                    onChange = { lastFoundMillis = it },
+                )
+                FindDateField(
+                    label = "Penultimo ritrovamento",
+                    utcMillis = previousFoundMillis,
+                    onChange = { previousFoundMillis = it },
+                )
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Foto (facoltativo)", style = MaterialTheme.typography.titleSmall)
+                SpotPhotos(photos = photos, actions = photoActions, thumbnailSize = 72.dp)
             }
 
             OutlinedTextField(
@@ -173,7 +279,12 @@ fun AddSpotScreen(
             )
 
             Button(
-                onClick = { location?.let { onSave(name, category, notes, it) } },
+                onClick = {
+                    location?.let {
+                        val findDates = listOfNotNull(lastFoundMillis, previousFoundMillis).map(::utcMillisToDate)
+                        onSave(name, categories, quantity, notes, findDates, photos, it)
+                    }
+                },
                 enabled = canSave,
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -183,7 +294,12 @@ fun AddSpotScreen(
     }
 }
 
-private enum class LocationSource(val label: String) { GPS("GPS"), LINK("Link o coordinate") }
+private enum class LocationSource(val label: String) {
+    /** The position already stored, offered only when editing a spot. */
+    SAVED("Attuale"),
+    GPS("GPS"),
+    LINK("Link o coordinate"),
+}
 
 private sealed interface LinkState {
     data object Empty : LinkState
@@ -196,8 +312,10 @@ private const val LINK_DEBOUNCE_MS = 400L
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LocationCard(
+    sources: List<LocationSource>,
     source: LocationSource,
     onSourceChange: (LocationSource) -> Unit,
+    savedPoint: GeoPoint?,
     gpsState: LocationState,
     onRetry: () -> Unit,
     linkText: String,
@@ -208,15 +326,16 @@ private fun LocationCard(
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Posizione", style = MaterialTheme.typography.titleSmall)
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                LocationSource.entries.forEach { option ->
+                sources.forEachIndexed { index, option ->
                     SegmentedButton(
                         selected = option == source,
                         onClick = { onSourceChange(option) },
-                        shape = SegmentedButtonDefaults.itemShape(option.ordinal, LocationSource.entries.size),
+                        shape = SegmentedButtonDefaults.itemShape(index, sources.size),
                     ) { Text(option.label) }
                 }
             }
             when (source) {
+                LocationSource.SAVED -> savedPoint?.let { FoundPoint(it) }
                 LocationSource.GPS -> GpsLocation(gpsState, onRetry)
                 LocationSource.LINK -> LinkLocation(linkText, onLinkTextChange, linkState)
             }
@@ -313,3 +432,55 @@ private fun FoundPoint(point: GeoPoint) {
         )
     }
 }
+
+/** A date the user can pick or leave empty; [utcMillis] is midnight UTC, as used by the date picker. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FindDateField(label: String, utcMillis: Long?, onChange: (Long?) -> Unit) {
+    var picking by remember { mutableStateOf(false) }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        OutlinedButton(onClick = { picking = true }, modifier = Modifier.weight(1f)) {
+            Icon(Icons.Outlined.CalendarMonth, contentDescription = null, modifier = Modifier.size(18.dp))
+            Text(
+                "$label: ${utcMillis?.let { formatDate(utcMillisToDate(it)) } ?: "non indicato"}",
+                modifier = Modifier.padding(start = 8.dp).weight(1f),
+            )
+        }
+        if (utcMillis != null) {
+            IconButton(onClick = { onChange(null) }) {
+                Icon(Icons.Filled.Clear, contentDescription = "Togli data")
+            }
+        }
+    }
+    if (picking) {
+        val todayMillis = remember {
+            Clock.System.todayIn(TimeZone.currentSystemDefault()).atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds()
+        }
+        val state = rememberDatePickerState(
+            initialSelectedDateMillis = utcMillis,
+            selectableDates = object : SelectableDates {
+                // A find cannot be in the future
+                override fun isSelectableDate(utcTimeMillis: Long) = utcTimeMillis <= todayMillis
+            },
+        )
+        DatePickerDialog(
+            onDismissRequest = { picking = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    onChange(state.selectedDateMillis)
+                    picking = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { picking = false }) { Text("Annulla") }
+            },
+        ) {
+            DatePicker(state = state)
+        }
+    }
+}
+
+private fun utcMillisToDate(utcMillis: Long): LocalDate =
+    Instant.fromEpochMilliseconds(utcMillis).toLocalDateTime(TimeZone.UTC).date
+
+private fun dateToUtcMillis(date: LocalDate): Long = date.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds()

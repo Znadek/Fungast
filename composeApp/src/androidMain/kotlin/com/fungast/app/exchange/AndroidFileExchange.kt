@@ -66,8 +66,8 @@ class AndroidFileExchange(private val activity: ComponentActivity) : FileExchang
     private companion object {
         const val EXPORT_DIR = "exports"
 
-        /** Thousands of spots fit in well under 1 MB; anything bigger is not a spot file. */
-        const val MAX_IMPORT_BYTES = 10 * 1024 * 1024
+        /** Thousands of spots fit in under 1 MB; the rest is room for a backup with ~100 photos. */
+        const val MAX_IMPORT_BYTES = 50 * 1024 * 1024
     }
 }
 

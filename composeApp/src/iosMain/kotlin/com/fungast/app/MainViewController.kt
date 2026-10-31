@@ -11,6 +11,10 @@ import com.fungast.app.location.IosHeadingProvider
 import com.fungast.app.location.IosLinkResolver
 import com.fungast.app.location.IosLocationProvider
 import com.fungast.app.map.IosOfflineMaps
+import com.fungast.app.photos.IosPhotoPicker
+import com.fungast.app.photos.IosPhotoStore
+import com.fungast.app.routes.IosRouteRecorder
+import com.fungast.app.settings.IosAppSettings
 import platform.Foundation.NSHomeDirectory
 
 private val database: FungastDatabase by lazy {
@@ -23,11 +27,16 @@ private val database: FungastDatabase by lazy {
 fun MainViewController() = ComposeUIViewController {
     App(
         spotDao = database.spotDao(),
+        routeDao = database.routeDao(),
         locationProvider = IosLocationProvider(),
         headingProvider = IosHeadingProvider(),
         linkResolver = IosLinkResolver(),
         offlineMaps = IosOfflineMaps(),
         fileExchange = IosFileExchange(),
         qrScanner = IosQrScanner(),
+        photoStore = IosPhotoStore(),
+        photoPicker = IosPhotoPicker(),
+        routeRecorder = IosRouteRecorder(),
+        settings = IosAppSettings(),
     )
 }

@@ -8,6 +8,7 @@ import com.fungast.app.exchange.encodeSpots
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -24,11 +25,12 @@ import kotlinx.datetime.Instant
 class SpotExchangeViewModelTest {
     private val dao = FakeSpotDao()
     private val now = Instant.parse("2026-10-27T18:00:00Z")
-    private val viewModel = SpotExchangeViewModel(dao, FixedClock(now))
+    private val photoStore = FakePhotoStore()
+    private val viewModel = SpotExchangeViewModel(dao, photoStore, FixedClock(now))
 
     private fun spot(name: String, latitude: Double = 46.0, longitude: Double = 11.0) = Spot(
         name = name,
-        category = SpotCategory.MUSHROOMS,
+        categories = setOf(SpotCategory.MUSHROOMS),
         latitude = latitude,
         longitude = longitude,
         altitude = null,
@@ -58,6 +60,35 @@ class SpotExchangeViewModelTest {
         assertTrue(file.name.startsWith("fungast-2026-10-2") && file.name.endsWith(".gpx"), file.name)
         assertEquals("application/gpx+xml", file.mimeType)
         assertTrue("Faggeta" in file.content)
+    }
+
+    @Test
+    fun backupWithPhotosMovesThemToAnotherPhone() = runTest {
+        val photo = photoStore.save(byteArrayOf(1, 2, 3))
+        dao.insert(spot("Faggeta").copy(photos = listOf(photo)))
+        val file = assertNotNull(viewModel.buildExport(ExportFormat.FUNGAST, includePhotos = true))
+        assertEquals("fungast-2026-10-27-con-foto.fungast", file.name)
+
+        // Another phone: empty database and photo folder
+        val otherDao = FakeSpotDao()
+        val otherPhotos = FakePhotoStore()
+        SpotExchangeViewModel(otherDao, otherPhotos, FixedClock(now)).import(file.content)
+
+        val imported = otherDao.spots.value.single()
+        assertEquals(1, imported.photos.size)
+        assertContentEquals(byteArrayOf(1, 2, 3), otherPhotos.files[imported.photos.single()])
+    }
+
+    @Test
+    fun backupWithoutPhotosLeavesThemOut() = runTest {
+        val photo = photoStore.save(byteArrayOf(1, 2, 3))
+        dao.insert(spot("Faggeta").copy(photos = listOf(photo)))
+        val file = assertNotNull(viewModel.buildExport(ExportFormat.FUNGAST))
+
+        val otherDao = FakeSpotDao()
+        SpotExchangeViewModel(otherDao, FakePhotoStore(), FixedClock(now)).import(file.content)
+
+        assertEquals(emptyList(), otherDao.spots.value.single().photos)
     }
 
     @Test
