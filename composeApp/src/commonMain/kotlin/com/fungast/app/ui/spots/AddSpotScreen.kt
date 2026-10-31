@@ -50,6 +50,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.unit.dp
+import com.fungast.app.data.Spot
 import com.fungast.app.data.SpotCategory
 import com.fungast.app.location.GeoPoint
 import com.fungast.app.location.LinkResolver
@@ -86,6 +87,8 @@ fun AddSpotScreen(
     /** When set, the screen starts in link mode with this text (shared from another app). */
     initialLinkText: String?,
     photoPicker: PhotoPicker,
+    /** The saved spot being edited, or null for a new spot. */
+    spot: Spot? = null,
     onSave: (
         name: String,
         categories: Set<SpotCategory>,
@@ -98,15 +101,24 @@ fun AddSpotScreen(
     onDiscardPhotos: (List<String>) -> Unit,
     onBack: () -> Unit,
 ) {
-    var name by rememberSaveable { mutableStateOf("") }
-    var categories by rememberSaveable { mutableStateOf(setOf(SpotCategory.MUSHROOMS)) }
-    var notes by rememberSaveable { mutableStateOf("") }
+    var name by rememberSaveable { mutableStateOf(spot?.name.orEmpty()) }
+    var categories by rememberSaveable { mutableStateOf(spot?.categories ?: setOf(SpotCategory.MUSHROOMS)) }
+    var notes by rememberSaveable { mutableStateOf(spot?.notes.orEmpty()) }
     // Kept as the date picker's UTC millis: LocalDate cannot be saved in the instance state
-    var lastFoundMillis by rememberSaveable { mutableStateOf<Long?>(null) }
-    var previousFoundMillis by rememberSaveable { mutableStateOf<Long?>(null) }
-    var photos by rememberSaveable { mutableStateOf(listOf<String>()) }
+    var lastFoundMillis by rememberSaveable { mutableStateOf(spot?.lastFoundOn?.let(::dateToUtcMillis)) }
+    var previousFoundMillis by rememberSaveable { mutableStateOf(spot?.previousFoundOn?.let(::dateToUtcMillis)) }
+    var photos by rememberSaveable { mutableStateOf(spot?.photos.orEmpty()) }
+    // Only photos added here can be deleted when leaving; the spot's own go only when the edit is saved
+    val savedPhotos = spot?.photos.orEmpty().toSet()
+    val sources = if (spot != null) LocationSource.entries else LocationSource.entries - LocationSource.SAVED
     var source by rememberSaveable {
-        mutableStateOf(if (initialLinkText != null) LocationSource.LINK else LocationSource.GPS)
+        mutableStateOf(
+            when {
+                spot != null -> LocationSource.SAVED
+                initialLinkText != null -> LocationSource.LINK
+                else -> LocationSource.GPS
+            }
+        )
     }
     var locationState by remember { mutableStateOf<LocationState>(LocationState.Searching) }
     var linkText by rememberSaveable { mutableStateOf(initialLinkText.orEmpty()) }
@@ -138,13 +150,15 @@ fun AddSpotScreen(
         linkState = LinkState.Done(locationFromMapLink(linkText, linkResolver))
     }
 
+    val savedPoint = spot?.let { GeoPoint(it.latitude, it.longitude, it.altitude, it.accuracyMeters) }
     val location = when (source) {
+        LocationSource.SAVED -> savedPoint
         LocationSource.GPS -> (locationState as? LocationState.Found)?.point
         LocationSource.LINK -> ((linkState as? LinkState.Done)?.result as? MapLinkResult.Found)?.point
     }
     val canSave = name.isNotBlank() && categories.isNotEmpty() && location != null
     val leave = {
-        onDiscardPhotos(photos)
+        onDiscardPhotos(photos - savedPhotos)
         onBack()
     }
     PlatformBackHandler(onBack = leave)
@@ -153,14 +167,14 @@ fun AddSpotScreen(
         onPickPhotos = { scope.launch { photos = photos + photoPicker.pickPhotos() } },
         onRemovePhoto = { photo ->
             photos = photos - photo
-            onDiscardPhotos(listOf(photo))
+            if (photo !in savedPhotos) onDiscardPhotos(listOf(photo))
         },
     )
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Nuovo posto") },
+                title = { Text(if (spot != null) "Modifica posto" else "Nuovo posto") },
                 navigationIcon = {
                     IconButton(onClick = leave) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Indietro")
@@ -178,8 +192,10 @@ fun AddSpotScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             LocationCard(
+                sources = sources,
                 source = source,
                 onSourceChange = { source = it },
+                savedPoint = savedPoint,
                 gpsState = locationState,
                 onRetry = { scope.launch { locate() } },
                 linkText = linkText,
@@ -261,7 +277,12 @@ fun AddSpotScreen(
     }
 }
 
-private enum class LocationSource(val label: String) { GPS("GPS"), LINK("Link o coordinate") }
+private enum class LocationSource(val label: String) {
+    /** The position already stored, offered only when editing a spot. */
+    SAVED("Attuale"),
+    GPS("GPS"),
+    LINK("Link o coordinate"),
+}
 
 private sealed interface LinkState {
     data object Empty : LinkState
@@ -274,8 +295,10 @@ private const val LINK_DEBOUNCE_MS = 400L
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LocationCard(
+    sources: List<LocationSource>,
     source: LocationSource,
     onSourceChange: (LocationSource) -> Unit,
+    savedPoint: GeoPoint?,
     gpsState: LocationState,
     onRetry: () -> Unit,
     linkText: String,
@@ -286,15 +309,16 @@ private fun LocationCard(
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Posizione", style = MaterialTheme.typography.titleSmall)
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                LocationSource.entries.forEach { option ->
+                sources.forEachIndexed { index, option ->
                     SegmentedButton(
                         selected = option == source,
                         onClick = { onSourceChange(option) },
-                        shape = SegmentedButtonDefaults.itemShape(option.ordinal, LocationSource.entries.size),
+                        shape = SegmentedButtonDefaults.itemShape(index, sources.size),
                     ) { Text(option.label) }
                 }
             }
             when (source) {
+                LocationSource.SAVED -> savedPoint?.let { FoundPoint(it) }
                 LocationSource.GPS -> GpsLocation(gpsState, onRetry)
                 LocationSource.LINK -> LinkLocation(linkText, onLinkTextChange, linkState)
             }
@@ -441,3 +465,5 @@ private fun FindDateField(label: String, utcMillis: Long?, onChange: (Long?) -> 
 
 private fun utcMillisToDate(utcMillis: Long): LocalDate =
     Instant.fromEpochMilliseconds(utcMillis).toLocalDateTime(TimeZone.UTC).date
+
+private fun dateToUtcMillis(date: LocalDate): Long = date.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds()

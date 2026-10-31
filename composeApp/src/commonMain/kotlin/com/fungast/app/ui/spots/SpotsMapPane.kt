@@ -41,6 +41,7 @@ fun SpotsMapPane(
     downloadState: MapDownloadState,
     onDownloadArea: (MapViewport?) -> Unit,
     onGoToSpot: (Spot) -> Unit,
+    onEditSpot: (Spot) -> Unit,
     photoActions: (Spot) -> PhotoActions,
     routes: List<RouteTrack>,
     /** Route chosen in the routes list: highlighted and framed. */
@@ -95,6 +96,7 @@ fun SpotsMapPane(
                             SpotSummary(spot, modifier = Modifier.weight(1f))
                             ShowSpotQrButton(spot)
                             GoToSpotButton(onClick = { onGoToSpot(spot) })
+                            EditSpotButton(onClick = { onEditSpot(spot) })
                             IconButton(onClick = { selectedSpotId = null }) {
                                 Icon(Icons.Filled.Close, contentDescription = "Chiudi")
                             }

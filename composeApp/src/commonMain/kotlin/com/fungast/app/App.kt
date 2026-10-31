@@ -38,7 +38,7 @@ import com.fungast.app.ui.spots.SpotsViewModel
 import com.fungast.app.ui.theme.FungastTheme
 import kotlinx.coroutines.launch
 
-private enum class Screen { SpotList, AddSpot, GoToSpot, Routes, Guide }
+private enum class Screen { SpotList, AddSpot, EditSpot, GoToSpot, Routes, Guide }
 
 @Composable
 fun App(
@@ -76,6 +76,7 @@ fun App(
                 )
             }
             var initialLinkText by rememberSaveable { mutableStateOf(sharedText) }
+            var editSpotId by rememberSaveable { mutableStateOf<Long?>(null) }
             var targetSpotId by rememberSaveable { mutableStateOf<Long?>(null) }
             var focusedRouteId by rememberSaveable { mutableStateOf<Long?>(null) }
 
@@ -100,6 +101,10 @@ fun App(
                         onAddSpot = {
                             initialLinkText = null
                             screen = Screen.AddSpot
+                        },
+                        onEditSpot = {
+                            editSpotId = it.id
+                            screen = Screen.EditSpot
                         },
                         onDeleteSpot = viewModel::deleteSpot,
                         onGoToSpot = {
@@ -181,6 +186,24 @@ fun App(
                         onDiscardPhotos = viewModel::discardPhotos,
                         onBack = { screen = Screen.SpotList },
                     )
+                }
+                Screen.EditSpot -> {
+                    // Null only briefly after process restart, while spots reload from the database
+                    spots.find { it.id == editSpotId }?.let { spot ->
+                        AddSpotScreen(
+                            locationProvider = locationProvider,
+                            linkResolver = linkResolver,
+                            initialLinkText = null,
+                            photoPicker = photoPicker,
+                            spot = spot,
+                            onSave = { name, categories, notes, findDates, photos, location ->
+                                viewModel.updateSpot(spot.id, name, categories, notes, location, findDates, photos)
+                                screen = Screen.SpotList
+                            },
+                            onDiscardPhotos = viewModel::discardPhotos,
+                            onBack = { screen = Screen.SpotList },
+                        )
+                    }
                 }
                 Screen.Guide -> {
                     val closeGuide = {

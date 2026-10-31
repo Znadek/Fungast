@@ -82,6 +82,48 @@ class SpotsViewModelTest {
     }
 
     @Test
+    fun updateSpotChangesFieldsButKeepsIdAndCreationTime() {
+        val viewModel = SpotsViewModel(dao, photoStore, FixedClock(now))
+        viewModel.addSpot("Faggeta", setOf(SpotCategory.MUSHROOMS), "", GeoPoint(46.1, 11.2))
+        val original = dao.spots.value.single()
+
+        viewModel.updateSpot(
+            original.id,
+            name = " Castagneto ",
+            categories = setOf(SpotCategory.CHESTNUTS),
+            notes = "vicino al ponte ",
+            location = GeoPoint(45.0, 9.0, altitude = 600.0),
+            findDates = listOf(LocalDate(2026, 10, 20)),
+            photos = emptyList(),
+        )
+
+        val saved = dao.spots.value.single()
+        assertEquals(original.id, saved.id)
+        assertEquals(original.createdAt, saved.createdAt)
+        assertEquals("Castagneto", saved.name)
+        assertEquals("vicino al ponte", saved.notes)
+        assertEquals(setOf(SpotCategory.CHESTNUTS), saved.categories)
+        assertEquals(45.0, saved.latitude)
+        assertEquals(600.0, saved.altitude)
+        assertEquals(LocalDate(2026, 10, 20), saved.lastFoundOn)
+    }
+
+    @Test
+    fun updateSpotDeletesOnlyThePhotosRemovedFromIt() = runTest {
+        val viewModel = SpotsViewModel(dao, photoStore, FixedClock(now))
+        val kept = photoStore.save(byteArrayOf(1))
+        val removed = photoStore.save(byteArrayOf(2))
+        val added = photoStore.save(byteArrayOf(3))
+        viewModel.addSpot("Faggeta", setOf(SpotCategory.MUSHROOMS), "", GeoPoint(46.1, 11.2), photos = listOf(kept, removed))
+        val spot = dao.spots.value.single()
+
+        viewModel.updateSpot(spot.id, spot.name, spot.categories, spot.notes, GeoPoint(46.1, 11.2), emptyList(), listOf(kept, added))
+
+        assertEquals(listOf(kept, added), dao.spots.value.single().photos)
+        assertEquals(setOf(kept, added), photoStore.files.keys)
+    }
+
+    @Test
     fun deleteSpotRemovesIt() {
         val viewModel = SpotsViewModel(dao, photoStore, FixedClock(now))
         viewModel.addSpot("Castagneto", setOf(SpotCategory.CHESTNUTS), "", GeoPoint(45.0, 9.0))

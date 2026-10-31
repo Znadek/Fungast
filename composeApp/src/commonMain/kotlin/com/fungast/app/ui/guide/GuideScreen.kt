@@ -52,7 +52,9 @@ private val SECTIONS = listOf(
             "pochi secondi). Dai un nome, scegli cosa si trova (anche più di una cosa) e, se vuoi, aggiungi " +
             "le date degli ultimi due ritrovamenti, delle foto e delle note.\n\n" +
             "Da casa puoi scegliere \"Link o coordinate\" e incollare un link di Google Maps o delle " +
-            "coordinate. Oppure, in Google Maps, tieni premuto sul punto, tocca Condividi e scegli Fungast.",
+            "coordinate. Oppure, in Google Maps, tieni premuto sul punto, tocca Condividi e scegli Fungast.\n\n" +
+            "Per cambiare un posto già salvato tocca la matita accanto al posto: puoi correggere tutto, " +
+            "anche la posizione (con il GPS o con un link), oppure lasciare quella attuale.",
     ),
     GuideSection(
         Icons.Outlined.Explore,

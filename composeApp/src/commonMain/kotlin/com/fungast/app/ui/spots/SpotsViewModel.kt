@@ -49,6 +49,40 @@ class SpotsViewModel(
         viewModelScope.launch { spotDao.insert(spot) }
     }
 
+    /**
+     * Saves the edited fields of a spot, keeping its id and creation time. Photos no longer in [photos]
+     * are deleted only now, so leaving the edit without saving keeps them.
+     */
+    fun updateSpot(
+        spotId: Long,
+        name: String,
+        categories: Set<SpotCategory>,
+        notes: String,
+        location: GeoPoint,
+        findDates: List<LocalDate>,
+        photos: List<String>,
+    ) {
+        val (lastFoundOn, previousFoundOn) = lastTwoFinds(findDates)
+        viewModelScope.launch {
+            val spot = spotDao.getById(spotId) ?: return@launch photoStore.delete(photos)
+            spotDao.update(
+                spot.copy(
+                    name = name.trim(),
+                    categories = categories,
+                    latitude = location.latitude,
+                    longitude = location.longitude,
+                    altitude = location.altitude,
+                    accuracyMeters = location.accuracyMeters,
+                    notes = notes.trim(),
+                    lastFoundOn = lastFoundOn,
+                    previousFoundOn = previousFoundOn,
+                    photos = photos,
+                )
+            )
+            photoStore.delete(spot.photos - photos.toSet())
+        }
+    }
+
     fun deleteSpot(spot: Spot) {
         viewModelScope.launch {
             spotDao.delete(spot)

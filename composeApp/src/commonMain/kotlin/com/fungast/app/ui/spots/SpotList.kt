@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -41,6 +42,7 @@ fun SpotList(
     spots: List<Spot>,
     contentPadding: PaddingValues,
     onGoToSpot: (Spot) -> Unit,
+    onEditSpot: (Spot) -> Unit,
     onDeleteSpot: (Spot) -> Unit,
     photoActions: (Spot) -> PhotoActions,
     onShowGuide: () -> Unit,
@@ -80,6 +82,7 @@ fun SpotList(
                     spot = spot,
                     photoActions = photoActions(spot),
                     onGoTo = { onGoToSpot(spot) },
+                    onEdit = { onEditSpot(spot) },
                     onDelete = { spotToDelete = spot },
                 )
             }
@@ -113,13 +116,20 @@ fun SpotList(
 }
 
 @Composable
-private fun SpotItem(spot: Spot, photoActions: PhotoActions, onGoTo: () -> Unit, onDelete: () -> Unit) {
+private fun SpotItem(
+    spot: Spot,
+    photoActions: PhotoActions,
+    onGoTo: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 SpotSummary(spot, modifier = Modifier.weight(1f))
                 ShowSpotQrButton(spot)
                 GoToSpotButton(onClick = onGoTo)
+                EditSpotButton(onClick = onEdit)
                 IconButton(onClick = onDelete) {
                     Icon(Icons.Outlined.Delete, contentDescription = "Elimina")
                 }
@@ -139,6 +149,14 @@ private fun SpotItem(spot: Spot, photoActions: PhotoActions, onGoTo: () -> Unit,
 fun GoToSpotButton(onClick: () -> Unit) {
     IconButton(onClick = onClick) {
         Icon(Icons.Outlined.Explore, contentDescription = "Portami lì")
+    }
+}
+
+/** Opens the form to change a saved spot. */
+@Composable
+fun EditSpotButton(onClick: () -> Unit) {
+    IconButton(onClick = onClick) {
+        Icon(Icons.Outlined.Edit, contentDescription = "Modifica")
     }
 }
 
