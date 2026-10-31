@@ -2,6 +2,7 @@ package com.fungast.app.exchange
 
 import com.fungast.app.data.Spot
 import com.fungast.app.data.SpotCategory
+import com.fungast.app.data.SpotQuantity
 import com.fungast.app.data.lastTwoFinds
 import com.fungast.app.data.sortedCategories
 import kotlin.io.encoding.Base64
@@ -40,6 +41,8 @@ private data class SpotDto(
     val previousFoundOn: LocalDate? = null,
     /** Base64 JPEGs, only in backups exported with photos. */
     val photos: List<String> = emptyList(),
+    /** [SpotQuantity] name; unknown values from newer versions are dropped. */
+    val quantity: String? = null,
 )
 
 private val json = Json {
@@ -80,6 +83,7 @@ internal fun encodeFungast(
                     lastFoundOn = it.lastFoundOn,
                     previousFoundOn = it.previousFoundOn,
                     photos = it.photos.mapNotNull { name -> photos[name]?.let { bytes -> Base64.encode(bytes) } },
+                    quantity = it.quantity?.name,
                 )
             },
         ),
@@ -111,6 +115,7 @@ internal fun decodeFungast(text: String): List<DecodedSpot> {
             createdAt = it.createdAt.toEpochMilliseconds(),
             lastFoundOn = lastFoundOn,
             previousFoundOn = previousFoundOn,
+            quantity = SpotQuantity.entries.find { quantity -> quantity.name == it.quantity },
         )
         // A damaged photo should not stop the rest of the backup from being imported
         DecodedSpot(spot, it.photos.mapNotNull { photo -> runCatching { Base64.decode(photo) }.getOrNull() })

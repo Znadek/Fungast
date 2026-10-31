@@ -49,8 +49,8 @@ private val SECTIONS = listOf(
         Icons.Filled.AddLocationAlt,
         "Salvare un posto",
         "Quando sei sul posto tocca \"Salva posto\": la posizione arriva dal GPS (all'aperto bastano " +
-            "pochi secondi). Dai un nome, scegli cosa si trova (anche più di una cosa) e, se vuoi, aggiungi " +
-            "le date degli ultimi due ritrovamenti, delle foto e delle note.\n\n" +
+            "pochi secondi). Dai un nome, scegli cosa si trova (anche più di una cosa) e, se vuoi, quanto se ne " +
+            "trova (poco, buono, abbondante), le date degli ultimi due ritrovamenti, delle foto e delle note.\n\n" +
             "Da casa puoi scegliere \"Link o coordinate\" e incollare un link di Google Maps o delle " +
             "coordinate. Oppure, in Google Maps, tieni premuto sul punto, tocca Condividi e scegli Fungast.\n\n" +
             "Per cambiare un posto già salvato tocca la matita accanto al posto: puoi correggere tutto, " +

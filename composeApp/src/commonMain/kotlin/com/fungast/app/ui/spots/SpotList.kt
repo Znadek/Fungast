@@ -170,6 +170,13 @@ fun SpotSummary(spot: Spot, modifier: Modifier = Modifier) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        spot.quantity?.let {
+            Text(
+                "Quantità: ${it.label.lowercase()}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         if (spot.findDates.isNotEmpty()) {
             Text(
                 (if (spot.findDates.size == 1) "Ultimo ritrovamento: " else "Ultimi ritrovamenti: ") +

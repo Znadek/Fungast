@@ -2,6 +2,7 @@ package com.fungast.app.exchange
 
 import com.fungast.app.data.Spot
 import com.fungast.app.data.SpotCategory
+import com.fungast.app.data.SpotQuantity
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -24,6 +25,7 @@ class SpotFilesTest {
             createdAt = Instant.parse("2026-09-12T07:30:00Z").toEpochMilliseconds(),
             lastFoundOn = LocalDate(2026, 10, 20),
             previousFoundOn = LocalDate(2025, 9, 30),
+            quantity = SpotQuantity.ABUNDANT,
         ),
         Spot(
             id = 8,
@@ -52,6 +54,24 @@ class SpotFilesTest {
 
         assertTrue("1.0E-4" !in text, "coordinates must not use scientific notation")
         assertEquals(spots.map { it.copy(id = 0, accuracyMeters = null, lastFoundOn = null, previousFoundOn = null) }, decoded)
+    }
+
+    @Test
+    fun gpxQuantityWithoutNotesIsReadBackAsQuantityOnly() {
+        val spot = spots[1].copy(quantity = SpotQuantity.LOW)
+        val text = encodeSpots(listOf(spot), ExportFormat.GPX, now)
+
+        assertTrue("<desc>Quantità: poco</desc>" in text)
+        val decoded = decodeSpots(text, now).single()
+        assertEquals("", decoded.notes)
+        assertEquals(SpotQuantity.LOW, decoded.quantity)
+    }
+
+    @Test
+    fun unknownQuantityInFungastFileIsDropped() {
+        val text = encodeSpots(spots.take(1), ExportFormat.FUNGAST, now).replace("\"ABUNDANT\"", "\"HUGE\"")
+
+        assertEquals(null, decodeSpots(text, now).single().quantity)
     }
 
     @Test

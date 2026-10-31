@@ -179,8 +179,8 @@ fun App(
                         linkResolver = linkResolver,
                         initialLinkText = initialLinkText,
                         photoPicker = photoPicker,
-                        onSave = { name, categories, notes, findDates, photos, location ->
-                            viewModel.addSpot(name, categories, notes, location, findDates, photos)
+                        onSave = { name, categories, quantity, notes, findDates, photos, location ->
+                            viewModel.addSpot(name, categories, notes, location, findDates, photos, quantity)
                             screen = Screen.SpotList
                         },
                         onDiscardPhotos = viewModel::discardPhotos,
@@ -196,8 +196,8 @@ fun App(
                             initialLinkText = null,
                             photoPicker = photoPicker,
                             spot = spot,
-                            onSave = { name, categories, notes, findDates, photos, location ->
-                                viewModel.updateSpot(spot.id, name, categories, notes, location, findDates, photos)
+                            onSave = { name, categories, quantity, notes, findDates, photos, location ->
+                                viewModel.updateSpot(spot.id, name, categories, notes, location, findDates, photos, quantity)
                                 screen = Screen.SpotList
                             },
                             onDiscardPhotos = viewModel::discardPhotos,

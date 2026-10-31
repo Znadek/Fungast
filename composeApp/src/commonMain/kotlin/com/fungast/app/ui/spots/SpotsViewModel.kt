@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.fungast.app.data.Spot
 import com.fungast.app.data.SpotCategory
 import com.fungast.app.data.SpotDao
+import com.fungast.app.data.SpotQuantity
 import com.fungast.app.data.lastTwoFinds
 import com.fungast.app.location.GeoPoint
 import com.fungast.app.photos.PhotoStore
@@ -31,6 +32,7 @@ class SpotsViewModel(
         location: GeoPoint,
         findDates: List<LocalDate> = emptyList(),
         photos: List<String> = emptyList(),
+        quantity: SpotQuantity? = null,
     ) {
         val (lastFoundOn, previousFoundOn) = lastTwoFinds(findDates)
         val spot = Spot(
@@ -45,6 +47,7 @@ class SpotsViewModel(
             lastFoundOn = lastFoundOn,
             previousFoundOn = previousFoundOn,
             photos = photos,
+            quantity = quantity,
         )
         viewModelScope.launch { spotDao.insert(spot) }
     }
@@ -61,6 +64,7 @@ class SpotsViewModel(
         location: GeoPoint,
         findDates: List<LocalDate>,
         photos: List<String>,
+        quantity: SpotQuantity?,
     ) {
         val (lastFoundOn, previousFoundOn) = lastTwoFinds(findDates)
         viewModelScope.launch {
@@ -77,6 +81,7 @@ class SpotsViewModel(
                     lastFoundOn = lastFoundOn,
                     previousFoundOn = previousFoundOn,
                     photos = photos,
+                    quantity = quantity,
                 )
             )
             photoStore.delete(spot.photos - photos.toSet())

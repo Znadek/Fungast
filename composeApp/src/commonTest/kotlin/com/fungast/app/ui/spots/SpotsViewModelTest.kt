@@ -2,6 +2,7 @@ package com.fungast.app.ui.spots
 
 import com.fungast.app.data.Spot
 import com.fungast.app.data.SpotCategory
+import com.fungast.app.data.SpotQuantity
 import com.fungast.app.location.GeoPoint
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -95,6 +96,7 @@ class SpotsViewModelTest {
             location = GeoPoint(45.0, 9.0, altitude = 600.0),
             findDates = listOf(LocalDate(2026, 10, 20)),
             photos = emptyList(),
+            quantity = SpotQuantity.GOOD,
         )
 
         val saved = dao.spots.value.single()
@@ -106,6 +108,7 @@ class SpotsViewModelTest {
         assertEquals(45.0, saved.latitude)
         assertEquals(600.0, saved.altitude)
         assertEquals(LocalDate(2026, 10, 20), saved.lastFoundOn)
+        assertEquals(SpotQuantity.GOOD, saved.quantity)
     }
 
     @Test
@@ -117,7 +120,7 @@ class SpotsViewModelTest {
         viewModel.addSpot("Faggeta", setOf(SpotCategory.MUSHROOMS), "", GeoPoint(46.1, 11.2), photos = listOf(kept, removed))
         val spot = dao.spots.value.single()
 
-        viewModel.updateSpot(spot.id, spot.name, spot.categories, spot.notes, GeoPoint(46.1, 11.2), emptyList(), listOf(kept, added))
+        viewModel.updateSpot(spot.id, spot.name, spot.categories, spot.notes, GeoPoint(46.1, 11.2), emptyList(), listOf(kept, added), null)
 
         assertEquals(listOf(kept, added), dao.spots.value.single().photos)
         assertEquals(setOf(kept, added), photoStore.files.keys)

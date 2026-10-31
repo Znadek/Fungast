@@ -24,6 +24,8 @@ data class Spot(
     val previousFoundOn: LocalDate? = null,
     /** File names in the [com.fungast.app.photos.PhotoStore], oldest first. */
     @ColumnInfo(defaultValue = "") val photos: List<String> = emptyList(),
+    /** How much the user usually finds there, if they said. */
+    val quantity: SpotQuantity? = null,
 )
 
 enum class SpotCategory(val label: String) {
@@ -32,6 +34,13 @@ enum class SpotCategory(val label: String) {
     BERRIES("Frutti di bosco"),
     ASPARAGUS("Asparagi"),
     OTHER("Altro"),
+}
+
+/** Stored by name: add new values at the end and never rename them. */
+enum class SpotQuantity(val label: String) {
+    LOW("Poco"),
+    GOOD("Buono"),
+    ABUNDANT("Abbondante"),
 }
 
 /** Categories in their fixed order, so lists and files always show them the same way. */

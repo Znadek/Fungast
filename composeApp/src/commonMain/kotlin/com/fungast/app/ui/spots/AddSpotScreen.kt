@@ -52,6 +52,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.unit.dp
 import com.fungast.app.data.Spot
 import com.fungast.app.data.SpotCategory
+import com.fungast.app.data.SpotQuantity
 import com.fungast.app.location.GeoPoint
 import com.fungast.app.location.LinkResolver
 import com.fungast.app.location.LocationProvider
@@ -92,6 +93,7 @@ fun AddSpotScreen(
     onSave: (
         name: String,
         categories: Set<SpotCategory>,
+        quantity: SpotQuantity?,
         notes: String,
         findDates: List<LocalDate>,
         photos: List<String>,
@@ -103,6 +105,7 @@ fun AddSpotScreen(
 ) {
     var name by rememberSaveable { mutableStateOf(spot?.name.orEmpty()) }
     var categories by rememberSaveable { mutableStateOf(spot?.categories ?: setOf(SpotCategory.MUSHROOMS)) }
+    var quantity by rememberSaveable { mutableStateOf(spot?.quantity) }
     var notes by rememberSaveable { mutableStateOf(spot?.notes.orEmpty()) }
     // Kept as the date picker's UTC millis: LocalDate cannot be saved in the instance state
     var lastFoundMillis by rememberSaveable { mutableStateOf(spot?.lastFoundOn?.let(::dateToUtcMillis)) }
@@ -235,6 +238,20 @@ fun AddSpotScreen(
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Quantità (facoltativo)", style = MaterialTheme.typography.titleSmall)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SpotQuantity.entries.forEach { option ->
+                        FilterChip(
+                            selected = option == quantity,
+                            // Tapping the chosen one again clears it
+                            onClick = { quantity = if (option == quantity) null else option },
+                            label = { Text(option.label) },
+                        )
+                    }
+                }
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Ritrovamenti (facoltativo)", style = MaterialTheme.typography.titleSmall)
                 FindDateField(
                     label = "Ultimo ritrovamento",
@@ -265,7 +282,7 @@ fun AddSpotScreen(
                 onClick = {
                     location?.let {
                         val findDates = listOfNotNull(lastFoundMillis, previousFoundMillis).map(::utcMillisToDate)
-                        onSave(name, categories, notes, findDates, photos, it)
+                        onSave(name, categories, quantity, notes, findDates, photos, it)
                     }
                 },
                 enabled = canSave,
