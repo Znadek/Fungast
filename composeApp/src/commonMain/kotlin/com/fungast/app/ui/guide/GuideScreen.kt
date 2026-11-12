@@ -59,8 +59,9 @@ private val SECTIONS = listOf(
     GuideSection(
         Icons.Outlined.Explore,
         "Ritrovare un posto",
-        "I posti sono nell'elenco; con l'icona della mappa in alto li vedi sulla mappa, colorati per " +
-            "categoria. Tocca la bussola accanto a un posto (\"Portami lì\"): una freccia ti indica " +
+        "I posti sono nell'elenco; con l'icona della mappa in alto li vedi sulla mappa: ogni " +
+            "posto mostra le icone di cosa ci si trova (🍄 funghi, 🌰 castagne, 🫐 frutti di bosco, 🌱 asparagi, " +
+            "📍 altro). Tocca la bussola accanto a un posto (\"Portami lì\"): una freccia ti indica " +
             "direzione e distanza. Tieni il telefono in piano e lontano da oggetti metallici.",
     ),
     GuideSection(

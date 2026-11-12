@@ -4,7 +4,10 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.RectF
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -23,6 +26,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.fungast.app.data.Spot
 import com.fungast.app.data.mainCategory
+import com.fungast.app.data.sortedCategories
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
@@ -32,7 +36,6 @@ import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.expressions.Expression
-import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
@@ -44,8 +47,7 @@ import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
 
 private const val SPOTS_SOURCE = "spots"
-private const val SPOTS_CIRCLE_LAYER = "spots-circles"
-private const val SPOTS_LABEL_LAYER = "spots-labels"
+private const val SPOTS_LAYER = "spots-markers"
 private const val ROUTES_SOURCE = "routes"
 private const val ROUTES_LAYER = "routes-lines"
 private const val ROUTE_COLOR = "#E67E22"
@@ -57,6 +59,14 @@ private val DEFAULT_CAMERA = CameraPosition.Builder().target(LatLng(42.5, 12.5))
 private const val SINGLE_SPOT_ZOOM = 14.0
 private const val FIT_PADDING_PX = 160
 private const val TAP_TOLERANCE_PX = 24f
+
+// Marker sizes in dp, turned into pixels with the screen density
+private const val MARKER_EMOJI_SIZE_DP = 18f
+private const val MARKER_PADDING_DP = 5f
+private const val MARKER_EMOJI_GAP_DP = 2f
+private const val MARKER_STROKE_DP = 2.5f
+// Label distance from the marker center, in ems of the 12sp label: just below the ~30dp marker
+private const val LABEL_OFFSET_EMS = 1.4f
 
 @Composable
 actual fun SpotsMap(
@@ -109,7 +119,7 @@ actual fun SpotsMap(
                     point.x - TAP_TOLERANCE_PX, point.y - TAP_TOLERANCE_PX,
                     point.x + TAP_TOLERANCE_PX, point.y + TAP_TOLERANCE_PX,
                 )
-                val spotId = mapLibreMap.queryRenderedFeatures(area, SPOTS_CIRCLE_LAYER)
+                val spotId = mapLibreMap.queryRenderedFeatures(area, SPOTS_LAYER)
                     .firstOrNull()?.getNumberProperty("id")?.toLong()
                 val spot = currentSpots.find { it.id == spotId } ?: return@addOnMapClickListener false
                 currentOnSpotClick(spot)
@@ -142,6 +152,11 @@ actual fun SpotsMap(
 
     LaunchedEffect(style, spots) {
         val loadedStyle = style ?: return@LaunchedEffect
+        // Images first, or the markers of new category combinations would briefly be missing
+        val density = context.resources.displayMetrics.density
+        spots.distinctBy { it.markerImageId }
+            .filter { loadedStyle.getImage(it.markerImageId) == null }
+            .forEach { loadedStyle.addImage(it.markerImageId, it.markerBitmap(density)) }
         loadedStyle.getSourceAs<GeoJsonSource>(SPOTS_SOURCE)?.setGeoJson(spots.toFeatureCollection())
         // A route to show takes over the first framing
         if (!cameraFitted && spots.isNotEmpty() && focusedRouteId == null) {
@@ -170,21 +185,17 @@ actual fun SpotsMap(
 private fun Style.addSpotLayers() {
     addSource(GeoJsonSource(SPOTS_SOURCE))
     addLayer(
-        CircleLayer(SPOTS_CIRCLE_LAYER, SPOTS_SOURCE).withProperties(
-            PropertyFactory.circleRadius(8f),
-            PropertyFactory.circleColor(Expression.toColor(Expression.get("color"))),
-            PropertyFactory.circleStrokeWidth(2f),
-            PropertyFactory.circleStrokeColor(Color.WHITE),
-        )
-    )
-    addLayer(
-        SymbolLayer(SPOTS_LABEL_LAYER, SPOTS_SOURCE).withProperties(
+        SymbolLayer(SPOTS_LAYER, SPOTS_SOURCE).withProperties(
+            PropertyFactory.iconImage(Expression.get("icon")),
+            // Every spot stays visible even when markers overlap; only the names are dropped
+            PropertyFactory.iconAllowOverlap(true),
+            PropertyFactory.iconIgnorePlacement(true),
             PropertyFactory.textField(Expression.get("name")),
             // Must be a font served by the style's glyph endpoint
             PropertyFactory.textFont(arrayOf("Noto Sans Regular")),
             PropertyFactory.textSize(12f),
             PropertyFactory.textAnchor(Property.TEXT_ANCHOR_TOP),
-            PropertyFactory.textOffset(arrayOf(0f, 1f)),
+            PropertyFactory.textOffset(arrayOf(0f, LABEL_OFFSET_EMS)),
             PropertyFactory.textHaloColor(Color.WHITE),
             PropertyFactory.textHaloWidth(1.5f),
             PropertyFactory.textOptional(true),
@@ -227,10 +238,52 @@ private fun List<Spot>.toFeatureCollection(): FeatureCollection =
             Feature.fromGeometry(Point.fromLngLat(spot.longitude, spot.latitude)).apply {
                 addNumberProperty("id", spot.id)
                 addStringProperty("name", spot.name)
-                addStringProperty("color", spot.mainCategory.markerColorHex)
+                addStringProperty("icon", spot.markerImageId)
             }
         }
     )
+
+/**
+ * A white rounded badge with the emoji of every category side by side, outlined in the color of the
+ * main category, so spots can still be told apart at a glance when the emoji are tiny.
+ */
+private fun Spot.markerBitmap(density: Float): Bitmap {
+    val emojiPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = MARKER_EMOJI_SIZE_DP * density }
+    val emojis = sortedCategories.ifEmpty { listOf(mainCategory) }.map { category ->
+        if (emojiPaint.hasGlyph(category.markerEmoji)) category.markerEmoji else category.markerEmojiFallback
+    }
+    val padding = MARKER_PADDING_DP * density
+    val gap = MARKER_EMOJI_GAP_DP * density
+    val stroke = MARKER_STROKE_DP * density
+    val widths = emojis.map { emojiPaint.measureText(it) }
+    val metrics = emojiPaint.fontMetrics
+    val emojiHeight = metrics.descent - metrics.ascent
+    val width = widths.sum() + gap * (emojis.size - 1) + 2 * padding
+    val height = emojiHeight + 2 * padding
+    // Never narrower than tall, so a single emoji gets a round badge
+    val bitmapWidth = maxOf(width, height)
+
+    val bitmap = Bitmap.createBitmap(bitmapWidth.toInt() + 1, height.toInt() + 1, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val inset = stroke / 2
+    val radius = height / 2 - inset
+    val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
+    val outline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = stroke
+        color = Color.parseColor(mainCategory.markerColorHex)
+    }
+    canvas.drawRoundRect(inset, inset, bitmapWidth - inset, height - inset, radius, radius, fill)
+    canvas.drawRoundRect(inset, inset, bitmapWidth - inset, height - inset, radius, radius, outline)
+
+    var x = (bitmapWidth - (width - 2 * padding)) / 2
+    val baseline = padding - metrics.ascent
+    emojis.forEachIndexed { index, emoji ->
+        canvas.drawText(emoji, x, baseline, emojiPaint)
+        x += widths[index] + gap
+    }
+    return bitmap
+}
 
 private fun MapLibreMap.frame(points: List<LatLng>) {
     val update = if (points.distinct().size == 1) {
