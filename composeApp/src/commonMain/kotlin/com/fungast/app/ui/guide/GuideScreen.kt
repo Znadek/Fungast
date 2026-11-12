@@ -59,8 +59,9 @@ private val SECTIONS = listOf(
     GuideSection(
         Icons.Outlined.Explore,
         "Ritrovare un posto",
-        "I posti sono nell'elenco; con l'icona della mappa in alto li vedi sulla mappa, colorati per " +
-            "categoria. Tocca la bussola accanto a un posto (\"Portami lì\"): una freccia ti indica " +
+        "I posti sono nell'elenco; con l'icona della mappa in alto li vedi sulla mappa: ogni " +
+            "posto mostra le icone di cosa ci si trova (🍄 funghi, 🌰 castagne, 🫐 frutti di bosco, 🌱 asparagi, " +
+            "📍 altro). Tocca la bussola accanto a un posto (\"Portami lì\"): una freccia ti indica " +
             "direzione e distanza. Tieni il telefono in piano e lontano da oggetti metallici.",
     ),
     GuideSection(
@@ -82,7 +83,7 @@ private val SECTIONS = listOf(
         "Registrare un percorso",
         "Tocca l'icona del percorso in alto: Fungast registra la strada che fai, anche a schermo spento " +
             "(lo vedi dalla notifica). Quando hai finito tocca \"Interrompi\", dai un nome al percorso e " +
-            "salvalo. La linea del percorso sulla mappa è utile anche per tornare indietro, per esempio alla " +
+            "salvalo; se non ti serve tocca \"Annulla\" e la registrazione viene scartata. La linea del percorso sulla mappa è utile anche per tornare indietro, per esempio alla " +
             "macchina.\n\nI percorsi salvati sono nel menu ⋮ → \"I miei percorsi\": da lì li mostri sulla " +
             "mappa, li rinomini o li elimini.",
     ),
