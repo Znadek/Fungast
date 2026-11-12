@@ -83,7 +83,7 @@ private val SECTIONS = listOf(
         "Registrare un percorso",
         "Tocca l'icona del percorso in alto: Fungast registra la strada che fai, anche a schermo spento " +
             "(lo vedi dalla notifica). Quando hai finito tocca \"Interrompi\", dai un nome al percorso e " +
-            "salvalo. La linea del percorso sulla mappa è utile anche per tornare indietro, per esempio alla " +
+            "salvalo; se non ti serve tocca \"Annulla\" e la registrazione viene scartata. La linea del percorso sulla mappa è utile anche per tornare indietro, per esempio alla " +
             "macchina.\n\nI percorsi salvati sono nel menu ⋮ → \"I miei percorsi\": da lì li mostri sulla " +
             "mappa, li rinomini o li elimini.",
     ),

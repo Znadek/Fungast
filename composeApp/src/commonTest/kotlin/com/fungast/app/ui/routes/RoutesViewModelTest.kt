@@ -56,6 +56,21 @@ class RoutesViewModelTest {
     }
 
     @Test
+    fun discardDeletesTheRouteBeingRecorded() = runTest {
+        viewModel.startRecording()
+        RouteTracker(dao, clock).apply {
+            record(GeoPoint(46.0, 11.0, accuracyMeters = 5f))
+            record(GeoPoint(46.001, 11.0, accuracyMeters = 5f))
+        }
+
+        viewModel.discardRecording()
+
+        assertTrue(dao.routes.value.isEmpty())
+        assertEquals(RouteMessage.Discarded, viewModel.message.value)
+        assertFalse(viewModel.isRecording())
+    }
+
+    @Test
     fun stopWithoutMovingSavesNothing() = runTest {
         viewModel.startRecording()
 

@@ -22,6 +22,7 @@ import kotlinx.datetime.toLocalDateTime
 sealed interface RouteMessage {
     data class Saved(val name: String) : RouteMessage
     data object TooShort : RouteMessage
+    data object Discarded : RouteMessage
     data object NoLocationPermission : RouteMessage
 }
 
@@ -74,6 +75,15 @@ class RoutesViewModel(
             val finalName = name.trim().ifEmpty { route.name }
             routeDao.rename(route.id, finalName)
             _message.value = if (tracker.finish()) RouteMessage.Saved(finalName) else RouteMessage.TooShort
+        }
+    }
+
+    /** Ends the recording throwing the route away; its points go with it (cascade). */
+    fun discardRecording() {
+        viewModelScope.launch {
+            val route = routeDao.getOpen() ?: return@launch
+            routeDao.delete(route)
+            _message.value = RouteMessage.Discarded
         }
     }
 

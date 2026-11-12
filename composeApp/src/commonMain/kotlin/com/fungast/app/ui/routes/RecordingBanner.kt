@@ -35,9 +35,15 @@ import kotlinx.datetime.Clock
 
 /** Shown on top of the list and the map while a route is being recorded. */
 @Composable
-fun RecordingBanner(route: Route, onStop: (name: String) -> Unit, modifier: Modifier = Modifier) {
+fun RecordingBanner(
+    route: Route,
+    onStop: (name: String) -> Unit,
+    onDiscard: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     var now by remember { mutableLongStateOf(Clock.System.now().toEpochMilliseconds()) }
     var confirmStop by rememberSaveable { mutableStateOf(false) }
+    var confirmDiscard by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         while (true) {
             now = Clock.System.now().toEpochMilliseconds()
@@ -66,6 +72,7 @@ fun RecordingBanner(route: Route, onStop: (name: String) -> Unit, modifier: Modi
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
+            TextButton(onClick = { confirmDiscard = true }) { Text("Annulla") }
             Button(onClick = { confirmStop = true }) { Text("Interrompi") }
         }
     }
@@ -91,6 +98,24 @@ fun RecordingBanner(route: Route, onStop: (name: String) -> Unit, modifier: Modi
             },
             dismissButton = {
                 TextButton(onClick = { confirmStop = false }) { Text("Continua a registrare") }
+            },
+        )
+    }
+
+    // Asked first: a mistaken tap would lose the whole walk
+    if (confirmDiscard) {
+        AlertDialog(
+            onDismissRequest = { confirmDiscard = false },
+            title = { Text("Scartare il percorso?") },
+            text = { Text("La traccia registrata finora verrà eliminata.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDiscard = false
+                    onDiscard()
+                }) { Text("Scarta") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDiscard = false }) { Text("Continua a registrare") }
             },
         )
     }

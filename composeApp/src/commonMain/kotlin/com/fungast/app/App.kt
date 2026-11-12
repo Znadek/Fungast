@@ -166,6 +166,10 @@ fun App(
                             routesViewModel.stopRecording(name)
                             routeRecorder.stop()
                         },
+                        onDiscardRecording = {
+                            routesViewModel.discardRecording()
+                            routeRecorder.stop()
+                        },
                         onShowRoutes = { screen = Screen.Routes },
                         onShowGuide = { screen = Screen.Guide },
                         onClearRouteFocus = { focusedRouteId = null },

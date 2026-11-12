@@ -69,6 +69,7 @@ fun SpotsHomeScreen(
     routeMessage: RouteMessage?,
     onStartRecording: () -> Unit,
     onStopRecording: (name: String) -> Unit,
+    onDiscardRecording: () -> Unit,
     onShowRoutes: () -> Unit,
     onShowGuide: () -> Unit,
     onClearRouteFocus: () -> Unit,
@@ -86,6 +87,7 @@ fun SpotsHomeScreen(
         val text = when (routeMessage) {
             is RouteMessage.Saved -> "Percorso \"${routeMessage.name}\" salvato."
             RouteMessage.TooShort -> "Percorso troppo corto: non è stato salvato."
+            RouteMessage.Discarded -> "Percorso scartato."
             RouteMessage.NoLocationPermission -> "Per registrare un percorso serve il permesso di posizione."
             null -> return@LaunchedEffect
         }
@@ -152,6 +154,7 @@ fun SpotsHomeScreen(
                 RecordingBanner(
                     route = it,
                     onStop = onStopRecording,
+                    onDiscard = onDiscardRecording,
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
                 )
             }
